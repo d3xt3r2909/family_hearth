@@ -13,17 +13,24 @@ class ChildPlaySurface extends StatefulWidget {
     required this.session,
     required this.onAnswer,
     this.overlay = false,
+    this.playfulButton = false,
   });
 
   final PlaySession session;
   final ValueChanged<String> onAnswer;
   final bool overlay;
+  final bool playfulButton;
 
   @override
   State<ChildPlaySurface> createState() => _ChildPlaySurfaceState();
 }
 
-class _ChildPlaySurfaceState extends State<ChildPlaySurface> {
+class _ChildPlaySurfaceState extends State<ChildPlaySurface>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _buttonMotion = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat();
   String? _lastPlayedPromptSignature;
   int _tapBurst = 0;
 
@@ -37,6 +44,12 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface> {
   void didUpdateWidget(covariant ChildPlaySurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     _playPromptSound();
+  }
+
+  @override
+  void dispose() {
+    _buttonMotion.dispose();
+    super.dispose();
   }
 
   void _playPromptSound() {
@@ -126,13 +139,18 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _BabyMomentVisual(
-                                session: session,
-                                label: targetLabel,
+                              _PlayfulBabyButtonMotion(
+                                enabled: widget.playfulButton,
+                                animation: _buttonMotion,
                                 accent: accent,
-                                size: visualSize,
-                                answered: answered,
-                                burstIndex: _tapBurst,
+                                child: _BabyMomentVisual(
+                                  session: session,
+                                  label: targetLabel,
+                                  accent: accent,
+                                  size: visualSize,
+                                  answered: answered,
+                                  burstIndex: _tapBurst,
+                                ),
                               ),
                               const SizedBox(height: 22),
                               Text(
@@ -347,6 +365,115 @@ class _RelativeMomentButton extends StatelessWidget {
       icon: Icon(_iconFor(activity, keyValue)),
       label: Text(label),
     );
+  }
+}
+
+class _PlayfulBabyButtonMotion extends StatelessWidget {
+  const _PlayfulBabyButtonMotion({
+    required this.enabled,
+    required this.animation,
+    required this.accent,
+    required this.child,
+  });
+
+  final bool enabled;
+  final Animation<double> animation;
+  final Color accent;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) {
+      return child;
+    }
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final phase = animation.value * math.pi * 2;
+        final scale = 1 + math.sin(phase) * 0.035;
+        final angle = math.sin(phase * 0.8) * 0.018;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: Transform.scale(
+                scale: 1.22 + math.sin(phase * 1.4) * 0.04,
+                child: CustomPaint(
+                  painter: _TapOrbitPainter(phase: phase, accent: accent),
+                ),
+              ),
+            ),
+            Transform.rotate(
+              angle: angle,
+              child: Transform.scale(scale: scale, child: child),
+            ),
+          ],
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+class _TapOrbitPainter extends CustomPainter {
+  const _TapOrbitPainter({required this.phase, required this.accent});
+
+  final double phase;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final shortestSide = math.min(size.width, size.height);
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (var index = 0; index < 9; index += 1) {
+      final angle = phase * 0.65 + index * math.pi * 2 / 9;
+      final radius = shortestSide * (0.42 + (index.isEven ? 0.08 : 0.03));
+      final bob = math.sin(phase * 1.6 + index) * shortestSide * 0.025;
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * (radius + bob);
+      final alpha = 0.34 + math.sin(phase + index) * 0.12;
+      paint.color = (index % 3 == 0 ? accent : const Color(0xFFFFB545))
+          .withValues(alpha: alpha.clamp(0.16, 0.46));
+
+      if (index % 4 == 0) {
+        _drawTinyStar(canvas, point, 8 + index % 3 * 2, phase + index, paint);
+      } else {
+        canvas.drawCircle(point, 7 + index % 3 * 2, paint);
+      }
+    }
+  }
+
+  void _drawTinyStar(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double rotation,
+    Paint paint,
+  ) {
+    final path = Path();
+    for (var index = 0; index < 10; index += 1) {
+      final pointRadius = index.isEven ? radius : radius * 0.52;
+      final angle = rotation + index * math.pi / 5;
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * pointRadius;
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TapOrbitPainter oldDelegate) {
+    return oldDelegate.phase != phase || oldDelegate.accent != accent;
   }
 }
 

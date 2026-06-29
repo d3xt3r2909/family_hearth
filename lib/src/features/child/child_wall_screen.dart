@@ -224,6 +224,7 @@ class _ActiveWall extends StatelessWidget {
               child: ChildPlaySurface(
                 session: playSession,
                 onAnswer: onPlayAnswer,
+                playfulButton: true,
               ),
             ),
         ],
@@ -282,31 +283,40 @@ class _CallingOverlay extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                child: WebRtcCallView(
-                  firebaseReady: firebaseReady,
-                  familyId: familyId,
-                  roomId: call.id,
-                  sessionId: _sessionIdFor(call),
-                  role: role,
-                  title: contact == null
-                      ? strings.familyIsHere
-                      : contact!.displayName,
-                  accent: accent,
-                  onEndCall: onEndCall,
-                ),
+                child: playSession.hasPrompt
+                    ? _CallPlaySplit(
+                        callView: WebRtcCallView(
+                          firebaseReady: firebaseReady,
+                          familyId: familyId,
+                          roomId: call.id,
+                          sessionId: _sessionIdFor(call),
+                          role: role,
+                          title: contact == null
+                              ? strings.familyIsHere
+                              : contact!.displayName,
+                          accent: accent,
+                          onEndCall: onEndCall,
+                        ),
+                        playSurface: ChildPlaySurface(
+                          session: playSession,
+                          onAnswer: onPlayAnswer,
+                          overlay: true,
+                          playfulButton: true,
+                        ),
+                      )
+                    : WebRtcCallView(
+                        firebaseReady: firebaseReady,
+                        familyId: familyId,
+                        roomId: call.id,
+                        sessionId: _sessionIdFor(call),
+                        role: role,
+                        title: contact == null
+                            ? strings.familyIsHere
+                            : contact!.displayName,
+                        accent: accent,
+                        onEndCall: onEndCall,
+                      ),
               ),
-              if (playSession.hasPrompt)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  right: 0,
-                  bottom: 92,
-                  child: ChildPlaySurface(
-                    session: playSession,
-                    onAnswer: onPlayAnswer,
-                    overlay: true,
-                  ),
-                ),
             ],
           ),
         ),
@@ -316,6 +326,59 @@ class _CallingOverlay extends StatelessWidget {
 
   String _sessionIdFor(CallSession call) {
     return '${call.id}-${call.createdAt.millisecondsSinceEpoch}';
+  }
+}
+
+class _CallPlaySplit extends StatelessWidget {
+  const _CallPlaySplit({required this.callView, required this.playSurface});
+
+  final Widget callView;
+  final Widget playSurface;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sideBySide = constraints.maxWidth >= 820;
+        final videoFlex = sideBySide ? 5 : 4;
+        final playFlex = sideBySide ? 4 : 5;
+
+        if (sideBySide) {
+          return Row(
+            children: [
+              Expanded(flex: videoFlex, child: callView),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: playFlex,
+                child: _PlaySurfaceFrame(child: playSurface),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Expanded(flex: videoFlex, child: callView),
+            const SizedBox(height: 14),
+            Expanded(
+              flex: playFlex,
+              child: _PlaySurfaceFrame(child: playSurface),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PlaySurfaceFrame extends StatelessWidget {
+  const _PlaySurfaceFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(borderRadius: BorderRadius.circular(8), child: child);
   }
 }
 
