@@ -21,6 +21,7 @@ class RelativeScreen extends StatelessWidget {
     required this.contacts,
     required this.onStartCallToChild,
     required this.onEndCall,
+    this.onSignOut,
   });
 
   final bool firebaseReady;
@@ -32,6 +33,7 @@ class RelativeScreen extends StatelessWidget {
   final List<FamilyContact> contacts;
   final VoidCallback onStartCallToChild;
   final VoidCallback onEndCall;
+  final VoidCallback? onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +72,11 @@ class RelativeScreen extends StatelessWidget {
         child: SafeArea(
           child: Stack(
             children: [
-              const Positioned(top: 14, right: 18, child: LanguageMenu()),
+              Positioned(
+                top: 14,
+                right: 18,
+                child: _RelativeHeaderActions(onSignOut: onSignOut),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 88, 22, 22),
                 child: Center(
@@ -243,5 +249,31 @@ class RelativeScreen extends StatelessWidget {
 
   String _sessionIdFor(CallSession call) {
     return '${call.id}-${call.createdAt.millisecondsSinceEpoch}';
+  }
+}
+
+class _RelativeHeaderActions extends StatelessWidget {
+  const _RelativeHeaderActions({required this.onSignOut});
+
+  final VoidCallback? onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const LanguageMenu(),
+        if (onSignOut != null) ...[
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            tooltip: strings.signOut,
+            onPressed: onSignOut,
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
+      ],
+    );
   }
 }

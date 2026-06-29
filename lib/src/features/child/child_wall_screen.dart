@@ -20,6 +20,7 @@ class ChildWallScreen extends StatelessWidget {
     required this.call,
     required this.onContactPressed,
     required this.onEndCall,
+    this.onSignOut,
   });
 
   final bool firebaseReady;
@@ -30,24 +31,80 @@ class ChildWallScreen extends StatelessWidget {
   final CallSession call;
   final ValueChanged<FamilyContact> onContactPressed;
   final VoidCallback onEndCall;
+  final VoidCallback? onSignOut;
 
   @override
   Widget build(BuildContext context) {
     return CameraOnFrame(
       active: cameraOn,
-      child: active
-          ? _ActiveWall(
-              firebaseReady: firebaseReady,
-              familyId: familyId,
-              contacts: contacts,
-              call: call,
-              onContactPressed: onContactPressed,
-              onEndCall: onEndCall,
-            )
-          : const _DimWall(),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: active
+                ? _ActiveWall(
+                    firebaseReady: firebaseReady,
+                    familyId: familyId,
+                    contacts: contacts,
+                    call: call,
+                    onContactPressed: onContactPressed,
+                    onEndCall: onEndCall,
+                  )
+                : const _DimWall(),
+          ),
+          if (onSignOut != null)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 14,
+              right: 18,
+              child: _WallAccountMenu(onSignOut: onSignOut!),
+            ),
+        ],
+      ),
     );
   }
 }
+
+class _WallAccountMenu extends StatelessWidget {
+  const _WallAccountMenu({required this.onSignOut});
+
+  final VoidCallback onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+
+    return Material(
+      color: const Color(0xCC1C2024),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: PopupMenuButton<_WallAccountAction>(
+        tooltip: strings.signOut,
+        color: const Color(0xFF1C2024),
+        position: PopupMenuPosition.under,
+        icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        onSelected: (action) {
+          switch (action) {
+            case _WallAccountAction.signOut:
+              onSignOut();
+          }
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem<_WallAccountAction>(
+            value: _WallAccountAction.signOut,
+            child: Row(
+              children: [
+                const Icon(Icons.logout_rounded),
+                const SizedBox(width: 10),
+                Text(strings.signOut),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _WallAccountAction { signOut }
 
 class _DimWall extends StatelessWidget {
   const _DimWall();

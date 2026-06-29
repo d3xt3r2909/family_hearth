@@ -451,6 +451,7 @@ class _HomeShellState extends State<HomeShell> {
         call: _call,
         onContactPressed: _recordTap,
         onEndCall: _endCall,
+        onSignOut: widget.onSignOut,
       ),
       AppRole.parent => ParentControlScreen(
         firebaseStatus: widget.firebaseStatus,
@@ -492,6 +493,7 @@ class _HomeShellState extends State<HomeShell> {
         contacts: _contacts,
         onStartCallToChild: _startRelativeCallToChild,
         onEndCall: _endCall,
+        onSignOut: widget.onSignOut,
       ),
     };
 
