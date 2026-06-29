@@ -539,6 +539,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       AppRole.parent => ParentControlScreen(
         firebaseStatus: widget.firebaseStatus,
+        familyId: _familyId,
         familyName: _familyName,
         inviteCode: _inviteCode,
         wallPairingCode: _wallPairingCode,
@@ -552,6 +553,7 @@ class _HomeShellState extends State<HomeShell> {
         schedules: _schedules,
         statsSummary: _statsSummary,
         activeCall: _call,
+        playSession: _playSession,
         cameraOn: _cameraOn,
         onActiveChanged: _setChildWallActive,
         onStartCallForChild: (contact) =>

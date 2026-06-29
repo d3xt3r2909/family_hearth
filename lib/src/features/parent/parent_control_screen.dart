@@ -5,9 +5,11 @@ import '../../domain/call_session.dart';
 import '../../domain/family_contact.dart';
 import '../../domain/family_membership.dart';
 import '../../domain/family_stats.dart';
+import '../../domain/play_session.dart';
 import '../../domain/schedule_window.dart';
 import '../../firebase/firebase_bootstrap.dart';
 import '../../i18n/app_localizations.dart';
+import '../child/child_wall_screen.dart';
 import '../shared/family_hearth_mark.dart';
 import '../shared/language_menu.dart';
 
@@ -15,6 +17,7 @@ class ParentControlScreen extends StatelessWidget {
   const ParentControlScreen({
     super.key,
     required this.firebaseStatus,
+    required this.familyId,
     required this.familyName,
     required this.inviteCode,
     required this.wallPairingCode,
@@ -26,6 +29,7 @@ class ParentControlScreen extends StatelessWidget {
     required this.schedules,
     required this.statsSummary,
     required this.activeCall,
+    required this.playSession,
     required this.cameraOn,
     required this.onActiveChanged,
     required this.onStartCallForChild,
@@ -42,6 +46,7 @@ class ParentControlScreen extends StatelessWidget {
   });
 
   final FirebaseBootstrapResult firebaseStatus;
+  final String familyId;
   final String familyName;
   final String inviteCode;
   final String wallPairingCode;
@@ -53,6 +58,7 @@ class ParentControlScreen extends StatelessWidget {
   final List<ScheduleWindow> schedules;
   final FamilyStatsSummary statsSummary;
   final CallSession activeCall;
+  final PlaySession playSession;
   final bool cameraOn;
   final ValueChanged<bool> onActiveChanged;
   final ValueChanged<FamilyContact> onStartCallForChild;
@@ -76,6 +82,44 @@ class ParentControlScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final activeContact = _contactForCall(activeCall, contacts);
 
+    return DefaultTabController(
+      length: 2,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildControls(context, activeContact),
+                ChildWallScreen(
+                  firebaseReady: firebaseStatus.isReady,
+                  familyId: familyId,
+                  currentUserId: currentUserId,
+                  active: childWallActive,
+                  cameraOn: cameraOn,
+                  contacts: contacts,
+                  call: activeCall,
+                  playSession: playSession,
+                  readOnly: true,
+                  onContactPressed: (_) {},
+                  onEndCall: () {},
+                  onPlayAnswer: (_) {},
+                  onPlayBoardStroke: (_) {},
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 14,
+            left: 18,
+            child: const _ParentViewSwitcher(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls(BuildContext context, FamilyContact? activeContact) {
     return DecoratedBox(
       decoration: const BoxDecoration(color: Color(0xFFFFF7EC)),
       child: Stack(
@@ -235,6 +279,49 @@ class ParentControlScreen extends StatelessWidget {
       }
     }
     return null;
+  }
+}
+
+class _ParentViewSwitcher extends StatelessWidget {
+  const _ParentViewSwitcher();
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+
+    return Material(
+      color: const Color(0xEE211913),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: TabBar(
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          dividerColor: Colors.transparent,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicator: BoxDecoration(
+            color: const Color(0xFFFFE2BF),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          labelColor: const Color(0xFF221B16),
+          unselectedLabelColor: Colors.white,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.tune_rounded),
+              text: strings.parentControls,
+            ),
+            Tab(
+              icon: const Icon(Icons.tablet_mac_rounded),
+              text: strings.wallPreview,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

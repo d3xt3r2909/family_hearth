@@ -14,6 +14,7 @@ class ChildPlaySurface extends StatefulWidget {
     required this.onAnswer,
     this.onBoardStroke,
     this.actorId = 'child-wall',
+    this.interactive = true,
     this.overlay = false,
     this.playfulButton = false,
   });
@@ -22,6 +23,7 @@ class ChildPlaySurface extends StatefulWidget {
   final ValueChanged<String> onAnswer;
   final ValueChanged<PlayBoardStroke>? onBoardStroke;
   final String actorId;
+  final bool interactive;
   final bool overlay;
   final bool playfulButton;
 
@@ -57,6 +59,9 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
   }
 
   void _handleBoardStroke(PlayBoardStroke stroke) {
+    if (!widget.interactive) {
+      return;
+    }
     _handleSurfaceTap();
     widget.onBoardStroke?.call(stroke);
   }
@@ -77,6 +82,9 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
   }
 
   void _handleSurfaceTap() {
+    if (!widget.interactive) {
+      return;
+    }
     final session = widget.session;
     if (!session.hasPrompt) {
       return;
@@ -110,7 +118,7 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
         borderRadius: widget.overlay
             ? BorderRadius.circular(8)
             : BorderRadius.zero,
-        onTap: session.hasPrompt && !session.hasBoard
+        onTap: widget.interactive && session.hasPrompt && !session.hasBoard
             ? _handleSurfaceTap
             : null,
         child: DecoratedBox(
@@ -139,7 +147,7 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
                   child: _PlayBoardSurface(
                     strokes: session.boardStrokes,
                     actorId: widget.actorId,
-                    enabled: widget.onBoardStroke != null,
+                    enabled: widget.interactive && widget.onBoardStroke != null,
                     onStrokeAdded: _handleBoardStroke,
                     colorValue: 0xFF197A6E,
                     fullBleed: true,

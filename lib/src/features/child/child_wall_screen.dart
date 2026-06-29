@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../domain/call_session.dart';
@@ -26,6 +28,7 @@ class ChildWallScreen extends StatelessWidget {
     required this.onEndCall,
     required this.onPlayAnswer,
     required this.onPlayBoardStroke,
+    this.readOnly = false,
     this.onSignOut,
   });
 
@@ -41,6 +44,7 @@ class ChildWallScreen extends StatelessWidget {
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
   final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final bool readOnly;
   final VoidCallback? onSignOut;
 
   @override
@@ -62,6 +66,7 @@ class ChildWallScreen extends StatelessWidget {
                     onEndCall: onEndCall,
                     onPlayAnswer: onPlayAnswer,
                     onPlayBoardStroke: onPlayBoardStroke,
+                    readOnly: readOnly,
                   )
                 : const _DimWall(),
           ),
@@ -153,6 +158,7 @@ class _ActiveWall extends StatelessWidget {
     required this.onEndCall,
     required this.onPlayAnswer,
     required this.onPlayBoardStroke,
+    required this.readOnly,
   });
 
   final bool firebaseReady;
@@ -165,20 +171,21 @@ class _ActiveWall extends StatelessWidget {
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
   final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
-    final activeCall = call.isActiveMedia;
-    final calledContact = _contactForCall(call, contacts);
+    final activeCall = !readOnly && call.isActiveMedia;
+    final calledContact = activeCall ? _contactForCall(call, contacts) : null;
 
     return DecoratedBox(
-      decoration: const BoxDecoration(color: Color(0xFFFFF7EC)),
+      decoration: const BoxDecoration(color: Color(0xFFFFF8EA)),
       child: Stack(
         children: [
           const Positioned.fill(child: CustomPaint(painter: _WallBackdrop())),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+              padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isCompact = constraints.maxWidth < 700;
@@ -190,17 +197,18 @@ class _ActiveWall extends StatelessWidget {
                       ? 2
                       : 1;
                   final tileAspect = constraints.maxWidth > 1100
-                      ? 0.72
+                      ? 0.9
                       : isCompact
-                      ? 0.82
-                      : 0.8;
+                      ? 0.86
+                      : 0.88;
 
                   return GridView.builder(
-                    padding: EdgeInsets.zero,
+                    padding: const EdgeInsets.only(top: 10, bottom: 28),
+                    physics: const BouncingScrollPhysics(),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
-                      mainAxisSpacing: 18,
-                      crossAxisSpacing: 18,
+                      mainAxisSpacing: 22,
+                      crossAxisSpacing: 22,
                       childAspectRatio: tileAspect,
                     ),
                     itemCount: contacts.length,
@@ -208,7 +216,8 @@ class _ActiveWall extends StatelessWidget {
                       final contact = contacts[index];
                       return ContactTile(
                         contact: contact,
-                        enabled: !activeCall,
+                        enabled: !activeCall && !readOnly,
+                        gardenIndex: index,
                         onPressed: () => onContactPressed(contact),
                       );
                     },
@@ -229,6 +238,7 @@ class _ActiveWall extends StatelessWidget {
                 onEndCall: onEndCall,
                 onPlayAnswer: onPlayAnswer,
                 onPlayBoardStroke: onPlayBoardStroke,
+                readOnly: readOnly,
               ),
             ),
           if (!activeCall && playSession.hasPlaySurface)
@@ -236,8 +246,9 @@ class _ActiveWall extends StatelessWidget {
               child: ChildPlaySurface(
                 session: playSession,
                 onAnswer: onPlayAnswer,
-                onBoardStroke: onPlayBoardStroke,
+                onBoardStroke: readOnly ? null : onPlayBoardStroke,
                 actorId: currentUserId ?? 'child-wall',
+                interactive: !readOnly,
                 playfulButton: true,
               ),
             ),
@@ -273,6 +284,7 @@ class _CallingOverlay extends StatelessWidget {
     required this.onEndCall,
     required this.onPlayAnswer,
     required this.onPlayBoardStroke,
+    required this.readOnly,
   });
 
   final bool firebaseReady;
@@ -284,6 +296,7 @@ class _CallingOverlay extends StatelessWidget {
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
   final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -318,8 +331,9 @@ class _CallingOverlay extends StatelessWidget {
                         playSurface: ChildPlaySurface(
                           session: playSession,
                           onAnswer: onPlayAnswer,
-                          onBoardStroke: onPlayBoardStroke,
+                          onBoardStroke: readOnly ? null : onPlayBoardStroke,
                           actorId: currentUserId ?? 'child-wall',
+                          interactive: !readOnly,
                           overlay: true,
                           playfulButton: true,
                         ),
@@ -409,15 +423,15 @@ class _WallBackdrop extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
 
-    paint.color = const Color(0xFFFFE2BF);
+    paint.color = const Color(0xFFFFE7C7);
     canvas.drawPath(
       Path()
         ..moveTo(0, size.height * 0.12)
         ..quadraticBezierTo(
-          size.width * 0.35,
-          size.height * 0.02,
+          size.width * 0.3,
+          size.height * 0.04,
           size.width,
-          size.height * 0.18,
+          size.height * 0.14,
         )
         ..lineTo(size.width, 0)
         ..lineTo(0, 0)
@@ -425,15 +439,15 @@ class _WallBackdrop extends CustomPainter {
       paint,
     );
 
-    paint.color = const Color(0xFFD9F0DF);
+    paint.color = const Color(0xFFDDF2E8);
     canvas.drawPath(
       Path()
-        ..moveTo(0, size.height * 0.78)
+        ..moveTo(0, size.height * 0.74)
         ..quadraticBezierTo(
-          size.width * 0.4,
-          size.height * 0.88,
+          size.width * 0.42,
+          size.height * 0.91,
           size.width,
-          size.height * 0.7,
+          size.height * 0.72,
         )
         ..lineTo(size.width, size.height)
         ..lineTo(0, size.height)
@@ -441,19 +455,102 @@ class _WallBackdrop extends CustomPainter {
       paint,
     );
 
-    paint
-      ..color = const Color(0x22E85D43)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+    _drawSoftCircle(
+      canvas,
+      Offset(size.width * 0.12, size.height * 0.22),
+      size.shortestSide * 0.1,
+      const Color(0xFFFFB545).withValues(alpha: 0.24),
+    );
+    _drawSoftCircle(
+      canvas,
+      Offset(size.width * 0.86, size.height * 0.28),
+      size.shortestSide * 0.07,
+      const Color(0xFF4967B1).withValues(alpha: 0.16),
+    );
+    _drawSoftCircle(
+      canvas,
+      Offset(size.width * 0.2, size.height * 0.86),
+      size.shortestSide * 0.08,
+      const Color(0xFFE85D43).withValues(alpha: 0.14),
+    );
 
-    for (var i = 0; i < 5; i++) {
-      final y = size.height * (0.22 + i * 0.11);
-      canvas.drawLine(
-        Offset(size.width * 0.06, y),
-        Offset(size.width * 0.94, y + 20),
-        paint,
+    paint
+      ..color = const Color(0x1A197A6E)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    for (var index = 0; index < 6; index += 1) {
+      final y = size.height * (0.18 + index * 0.12);
+      final path = Path()
+        ..moveTo(size.width * 0.08, y)
+        ..quadraticBezierTo(
+          size.width * 0.28,
+          y + (index.isEven ? 30 : -24),
+          size.width * 0.48,
+          y,
+        )
+        ..quadraticBezierTo(
+          size.width * 0.68,
+          y - (index.isEven ? 24 : -30),
+          size.width * 0.92,
+          y + 18,
+        );
+      canvas.drawPath(path, paint);
+    }
+
+    final starPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0x22E85D43);
+    for (var index = 0; index < 16; index += 1) {
+      final x = size.width * ((0.11 + index * 0.173) % 0.92);
+      final y = size.height * ((0.16 + index * 0.119) % 0.84);
+      _drawStar(
+        canvas,
+        Offset(x, y),
+        8 + (index % 3) * 2,
+        index * 0.4,
+        starPaint,
       );
     }
+  }
+
+  void _drawSoftCircle(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color color,
+  ) {
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = color,
+    );
+  }
+
+  void _drawStar(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double rotation,
+    Paint paint,
+  ) {
+    final path = Path();
+    for (var index = 0; index < 10; index += 1) {
+      final pointRadius = index.isEven ? radius : radius * 0.48;
+      final angle = rotation - 1.5708 + index * 0.6283;
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * pointRadius;
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
   }
 
   @override

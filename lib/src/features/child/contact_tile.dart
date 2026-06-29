@@ -10,11 +10,13 @@ class ContactTile extends StatefulWidget {
     super.key,
     required this.contact,
     required this.enabled,
+    this.gardenIndex = 0,
     required this.onPressed,
   });
 
   final FamilyContact contact;
   final bool enabled;
+  final int gardenIndex;
   final VoidCallback onPressed;
 
   @override
@@ -44,100 +46,116 @@ class _ContactTileState extends State<ContactTile>
       builder: (context, child) {
         final pulse =
             (math.sin((_controller.value + phase) * math.pi * 2) + 1) / 2;
-        final scale = widget.enabled ? 1.0 + pulse * 0.014 : 1.0;
-        return Transform.scale(scale: scale, child: child);
+        final scale = widget.enabled ? 1.0 + pulse * 0.018 : 1.0;
+        final bob = widget.enabled
+            ? math.sin((_controller.value + phase) * math.pi * 2) * 4
+            : 0.0;
+        final tilt = widget.enabled
+            ? math.sin((_controller.value + phase + 0.25) * math.pi * 2) * 0.012
+            : 0.0;
+        return Transform.translate(
+          offset: Offset(0, bob),
+          child: Transform.rotate(
+            angle: tilt,
+            child: Transform.scale(scale: scale, child: child),
+          ),
+        );
       },
       child: Semantics(
         button: true,
         label: context.t.callPerson(widget.contact.displayName),
         child: Material(
-          color: Colors.white,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          elevation: widget.enabled ? 14 : 2,
+          elevation: widget.enabled ? 18 : 2,
           shadowColor: accent.withValues(alpha: 0.28),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: widget.enabled ? widget.onPressed : null,
             child: Ink(
               decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.92),
                 border: Border.all(
-                  color: accent.withValues(alpha: 0.34),
-                  width: 2,
+                  color: accent.withValues(alpha: 0.48),
+                  width: 3,
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
+              child: Stack(
                 children: [
-                  Expanded(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CustomPaint(
-                          painter: _PortraitBackdropPainter(
-                            accent: accent,
-                            morph: _controller,
-                          ),
-                        ),
-                        Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.68,
-                            heightFactor: 0.68,
-                            child: CustomPaint(
-                              painter: _MorphingPortraitPainter(
-                                accent: accent,
-                                morph: _controller,
-                                phase: phase,
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  _iconFor(widget.contact.relationship),
-                                  color: accent,
-                                  size: 74,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 14,
-                          top: 14,
-                          child: _MediaBadge(accent: accent),
-                        ),
-                      ],
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _PortraitBackdropPainter(
+                        accent: accent,
+                        morph: _controller,
+                        phase: phase + widget.gardenIndex * 0.11,
+                      ),
                     ),
                   ),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-                    color: const Color(0xFF221B16),
-                    child: Column(
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            widget.contact.displayName,
-                            maxLines: 1,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0,
-                            ),
+                  Positioned.fill(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final shortestSide = math.min(
+                          constraints.maxWidth,
+                          constraints.maxHeight,
+                        );
+                        final portraitSize = shortestSide * 0.56;
+                        final iconSize = portraitSize * 0.46;
+                        final clampedPortraitSize = portraitSize
+                            .clamp(132.0, 230.0)
+                            .toDouble();
+                        final clampedIconSize = iconSize
+                            .clamp(62.0, 104.0)
+                            .toDouble();
+
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Center(
+                                  child: SizedBox.square(
+                                    dimension: clampedPortraitSize,
+                                    child: CustomPaint(
+                                      painter: _MorphingPortraitPainter(
+                                        accent: accent,
+                                        morph: _controller,
+                                        phase: phase,
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          _iconFor(widget.contact.relationship),
+                                          color: accent,
+                                          size: clampedIconSize,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _NameBubble(
+                                accent: accent,
+                                name: widget.contact.displayName,
+                                relationship: widget.contact.relationship,
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          widget.contact.relationship,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.78),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                      ],
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    right: 14,
+                    top: 14,
+                    child: _MediaBadge(accent: accent),
+                  ),
+                  Positioned(
+                    left: 14,
+                    top: 14,
+                    child: _MiniSparkleBadge(
+                      accent: accent,
+                      morph: _controller,
+                      phase: phase,
                     ),
                   ),
                 ],
@@ -170,6 +188,121 @@ class _ContactTileState extends State<ContactTile>
   }
 }
 
+class _NameBubble extends StatelessWidget {
+  const _NameBubble({
+    required this.accent,
+    required this.name,
+    required this.relationship,
+  });
+
+  final Color accent;
+  final String name;
+  final String relationship;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withValues(alpha: 0.34), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.14),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              name,
+              maxLines: 1,
+              style: const TextStyle(
+                color: Color(0xFF221B16),
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.favorite_rounded, color: accent, size: 17),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  relationship,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFF5F534A).withValues(alpha: 0.86),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniSparkleBadge extends StatelessWidget {
+  const _MiniSparkleBadge({
+    required this.accent,
+    required this.morph,
+    required this.phase,
+  });
+
+  final Color accent;
+  final Animation<double> morph;
+  final double phase;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: morph,
+      builder: (context, child) {
+        final turn = (morph.value + phase) * math.pi * 2;
+        return Transform.rotate(angle: turn * 0.08, child: child);
+      },
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFB545),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.auto_awesome_rounded,
+          color: Color(0xFF221B16),
+          size: 25,
+        ),
+      ),
+    );
+  }
+}
+
 class _MediaBadge extends StatelessWidget {
   const _MediaBadge({required this.accent});
 
@@ -178,42 +311,68 @@ class _MediaBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 44,
-      height: 44,
+      width: 58,
+      height: 58,
       decoration: BoxDecoration(
-        color: const Color(0xEEFFFFFF),
+        color: accent,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accent.withValues(alpha: 0.28)),
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.32),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Icon(Icons.play_arrow_rounded, color: accent, size: 30),
+      child: const Icon(Icons.videocam_rounded, color: Colors.white, size: 31),
     );
   }
 }
 
 class _PortraitBackdropPainter extends CustomPainter {
-  _PortraitBackdropPainter({required this.accent, required this.morph})
-    : super(repaint: morph);
+  _PortraitBackdropPainter({
+    required this.accent,
+    required this.morph,
+    required this.phase,
+  }) : super(repaint: morph);
 
   final Color accent;
   final Animation<double> morph;
+  final double phase;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final pulse = math.sin(morph.value * math.pi * 2);
+    final pulse = math.sin((morph.value + phase) * math.pi * 2);
     final base = Paint()..style = PaintingStyle.fill;
 
-    base.color = accent;
+    base.color = Color.alphaBlend(
+      accent.withValues(alpha: 0.08),
+      const Color(0xFFFFFBF2),
+    );
     canvas.drawRect(Offset.zero & size, base);
 
-    base.color = Color.alphaBlend(Colors.white.withValues(alpha: 0.22), accent);
+    base.color = accent.withValues(alpha: 0.12);
+    canvas.drawCircle(
+      Offset(size.width * (0.18 + pulse * 0.02), size.height * 0.24),
+      size.shortestSide * 0.23,
+      base,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.82, size.height * (0.32 - pulse * 0.02)),
+      size.shortestSide * 0.18,
+      base,
+    );
+
+    base.color = const Color(0xFFFFB545).withValues(alpha: 0.2);
     canvas.drawPath(
       Path()
-        ..moveTo(0, size.height * (0.7 + pulse * 0.025))
+        ..moveTo(0, size.height * (0.62 + pulse * 0.025))
         ..quadraticBezierTo(
           size.width * 0.5,
-          size.height * (0.5 - pulse * 0.035),
+          size.height * (0.48 - pulse * 0.035),
           size.width,
-          size.height * (0.76 - pulse * 0.02),
+          size.height * (0.7 - pulse * 0.02),
         )
         ..lineTo(size.width, size.height)
         ..lineTo(0, size.height)
@@ -223,22 +382,74 @@ class _PortraitBackdropPainter extends CustomPainter {
 
     final line = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = Colors.white.withValues(alpha: 0.22);
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..color = accent.withValues(alpha: 0.14);
 
-    for (var i = 0; i < 4; i++) {
-      final top = size.height * (0.15 + i * 0.16);
-      canvas.drawLine(
-        Offset(size.width * (0.1 + pulse * 0.018), top),
-        Offset(size.width * (0.9 - pulse * 0.018), top + size.height * 0.08),
-        line,
+    for (var index = 0; index < 4; index += 1) {
+      final y = size.height * (0.18 + index * 0.18);
+      final path = Path()
+        ..moveTo(size.width * 0.08, y)
+        ..quadraticBezierTo(
+          size.width * 0.38,
+          y + (index.isEven ? 16 : -12),
+          size.width * 0.62,
+          y,
+        )
+        ..quadraticBezierTo(
+          size.width * 0.78,
+          y - (index.isEven ? 12 : -16),
+          size.width * 0.92,
+          y + 8,
+        );
+      canvas.drawPath(path, line);
+    }
+
+    final starPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = accent.withValues(alpha: 0.18);
+    for (var index = 0; index < 7; index += 1) {
+      _drawStar(
+        canvas,
+        Offset(
+          size.width * ((0.16 + index * 0.21 + pulse * 0.01) % 0.86),
+          size.height * ((0.18 + index * 0.17) % 0.82),
+        ),
+        8 + index % 3 * 2,
+        phase + index,
+        starPaint,
       );
     }
   }
 
+  void _drawStar(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double rotation,
+    Paint paint,
+  ) {
+    final path = Path();
+    for (var index = 0; index < 10; index += 1) {
+      final pointRadius = index.isEven ? radius : radius * 0.48;
+      final angle = rotation - math.pi / 2 + index * math.pi / 5;
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * pointRadius;
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
   @override
   bool shouldRepaint(covariant _PortraitBackdropPainter oldDelegate) {
-    return oldDelegate.accent != accent || oldDelegate.morph != morph;
+    return oldDelegate.accent != accent ||
+        oldDelegate.morph != morph ||
+        oldDelegate.phase != phase;
   }
 }
 

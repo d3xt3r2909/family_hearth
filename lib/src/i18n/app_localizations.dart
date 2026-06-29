@@ -110,6 +110,8 @@ class AppStrings {
   String get wall => _pick('Wall', 'Zid', 'Wand');
   String get relative => _pick('Family', 'Porodica', 'Familie');
   String get childWall => _pick('Child wall', 'Dječiji zid', 'Kinderwand');
+  String get parentControls => _pick('Controls', 'Kontrole', 'Steuerung');
+  String get wallPreview => _pick('Wall view', 'Pogled zida', 'Wandansicht');
 
   String roleLabel(FamilyRole role) => switch (role) {
     FamilyRole.parent => parent,
