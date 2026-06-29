@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../domain/call_session.dart';
 import '../../domain/family_contact.dart';
+import '../../domain/play_session.dart';
 import '../../i18n/app_localizations.dart';
 import '../../webrtc/firestore_signaling_service.dart';
 import '../shared/camera_on_frame.dart';
 import '../shared/family_hearth_mark.dart';
 import '../shared/web_rtc_call_view.dart';
+import '../play/playroom_widgets.dart';
 import 'contact_tile.dart';
 
 class ChildWallScreen extends StatelessWidget {
@@ -18,8 +20,10 @@ class ChildWallScreen extends StatelessWidget {
     required this.cameraOn,
     required this.contacts,
     required this.call,
+    required this.playSession,
     required this.onContactPressed,
     required this.onEndCall,
+    required this.onPlayAnswer,
     this.onSignOut,
   });
 
@@ -29,8 +33,10 @@ class ChildWallScreen extends StatelessWidget {
   final bool cameraOn;
   final List<FamilyContact> contacts;
   final CallSession call;
+  final PlaySession playSession;
   final ValueChanged<FamilyContact> onContactPressed;
   final VoidCallback onEndCall;
+  final ValueChanged<String> onPlayAnswer;
   final VoidCallback? onSignOut;
 
   @override
@@ -46,8 +52,10 @@ class ChildWallScreen extends StatelessWidget {
                     familyId: familyId,
                     contacts: contacts,
                     call: call,
+                    playSession: playSession,
                     onContactPressed: onContactPressed,
                     onEndCall: onEndCall,
+                    onPlayAnswer: onPlayAnswer,
                   )
                 : const _DimWall(),
           ),
@@ -133,16 +141,20 @@ class _ActiveWall extends StatelessWidget {
     required this.familyId,
     required this.contacts,
     required this.call,
+    required this.playSession,
     required this.onContactPressed,
     required this.onEndCall,
+    required this.onPlayAnswer,
   });
 
   final bool firebaseReady;
   final String familyId;
   final List<FamilyContact> contacts;
   final CallSession call;
+  final PlaySession playSession;
   final ValueChanged<FamilyContact> onContactPressed;
   final VoidCallback onEndCall;
+  final ValueChanged<String> onPlayAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +214,16 @@ class _ActiveWall extends StatelessWidget {
                 familyId: familyId,
                 call: call,
                 contact: calledContact,
+                playSession: playSession,
                 onEndCall: onEndCall,
+                onPlayAnswer: onPlayAnswer,
+              ),
+            ),
+          if (!activeCall && playSession.hasPrompt)
+            Positioned.fill(
+              child: ChildPlaySurface(
+                session: playSession,
+                onAnswer: onPlayAnswer,
               ),
             ),
         ],
@@ -232,14 +253,18 @@ class _CallingOverlay extends StatelessWidget {
     required this.familyId,
     required this.call,
     required this.contact,
+    required this.playSession,
     required this.onEndCall,
+    required this.onPlayAnswer,
   });
 
   final bool firebaseReady;
   final String familyId;
   final CallSession call;
   final FamilyContact? contact;
+  final PlaySession playSession;
   final VoidCallback onEndCall;
+  final ValueChanged<String> onPlayAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -254,17 +279,35 @@ class _CallingOverlay extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(22, 88, 22, 22),
-          child: WebRtcCallView(
-            firebaseReady: firebaseReady,
-            familyId: familyId,
-            roomId: call.id,
-            sessionId: _sessionIdFor(call),
-            role: role,
-            title: contact == null
-                ? strings.familyIsHere
-                : contact!.displayName,
-            accent: accent,
-            onEndCall: onEndCall,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: WebRtcCallView(
+                  firebaseReady: firebaseReady,
+                  familyId: familyId,
+                  roomId: call.id,
+                  sessionId: _sessionIdFor(call),
+                  role: role,
+                  title: contact == null
+                      ? strings.familyIsHere
+                      : contact!.displayName,
+                  accent: accent,
+                  onEndCall: onEndCall,
+                ),
+              ),
+              if (playSession.hasPrompt)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  right: 0,
+                  bottom: 92,
+                  child: ChildPlaySurface(
+                    session: playSession,
+                    onAnswer: onPlayAnswer,
+                    overlay: true,
+                  ),
+                ),
+            ],
           ),
         ),
       ),

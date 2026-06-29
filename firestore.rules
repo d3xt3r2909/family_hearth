@@ -25,6 +25,14 @@ service cloud.firestore {
         );
     }
 
+    function memberRole(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function isRelative(familyId) {
+      return isMember(familyId) && memberRole(familyId) == 'relative';
+    }
+
     function isChildWall(familyId) {
       return isMember(familyId) &&
         get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'childWall';
@@ -204,6 +212,73 @@ service cloud.firestore {
         get(/databases/$(database)/documents/families/$(familyId)/calls/$(callId)).data.status in callLiveStatuses();
     }
 
+    function playFields() {
+      return [
+        'familyId',
+        'activity',
+        'status',
+        'targetKey',
+        'options',
+        'createdBy',
+        'createdAt',
+        'updatedAt',
+        'childResponseKey',
+        'childResponseCorrect',
+      ];
+    }
+
+    function validPlayCore(familyId) {
+      return request.resource.data.keys().hasAll([
+          'familyId',
+          'activity',
+          'status',
+          'targetKey',
+          'options',
+          'createdBy',
+          'createdAt',
+          'updatedAt',
+        ]) &&
+        request.resource.data.keys().hasOnly(playFields()) &&
+        request.resource.data.familyId == familyId &&
+        request.resource.data.activity in ['colorPop', 'findShape', 'peekabooBox'] &&
+        request.resource.data.status in ['idle', 'prompting', 'answered'] &&
+        request.resource.data.targetKey is string &&
+        request.resource.data.options is list &&
+        request.resource.data.createdBy is string &&
+        request.resource.data.createdAt is string &&
+        request.resource.data.updatedAt is string;
+    }
+
+    function validAnsweredPlay() {
+      return request.resource.data.status != 'answered' ||
+        (
+          request.resource.data.childResponseKey is string &&
+          request.resource.data.childResponseCorrect is bool
+        );
+    }
+
+    function canControlPlay(familyId) {
+      return validPlayCore(familyId) &&
+        validAnsweredPlay() &&
+        (isParent(familyId) || isRelative(familyId)) &&
+        request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function canAnswerPlay(familyId) {
+      return isChildWall(familyId) &&
+        resource.data.status == 'prompting' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'childResponseKey',
+          'childResponseCorrect',
+          'updatedAt',
+        ]) &&
+        request.resource.data.status == 'answered' &&
+        request.resource.data.childResponseKey is string &&
+        request.resource.data.childResponseCorrect is bool &&
+        request.resource.data.updatedAt is string;
+    }
+
     match /families/{familyId} {
       allow get, list: if isMember(familyId);
       allow create: if signedIn() &&
@@ -256,6 +331,13 @@ service cloud.firestore {
         match /calleeCandidates/{candidateId} {
           allow read, write: if canWriteCallCandidate(familyId, callId);
         }
+      }
+
+      match /playSessions/{playSessionId} {
+        allow read: if isMember(familyId);
+        allow create: if canControlPlay(familyId);
+        allow update: if canControlPlay(familyId) || canAnswerPlay(familyId);
+        allow delete: if isParent(familyId);
       }
     }
 

@@ -11,6 +11,7 @@ import '../domain/family_membership.dart';
 import '../domain/family_profile.dart';
 import '../domain/family_session.dart';
 import '../domain/family_stats.dart';
+import '../domain/play_session.dart';
 import '../domain/schedule_window.dart';
 import '../features/child/child_wall_screen.dart';
 import '../features/parent/parent_control_screen.dart';
@@ -42,6 +43,8 @@ class _HomeShellState extends State<HomeShell> {
       'local-family';
   late final String _callRoomId =
       Uri.base.queryParameters['room'] ?? 'family-main-room';
+  late final String _playRoomId =
+      Uri.base.queryParameters['play'] ?? 'family-main-playroom';
   late AppRole _role = _initialRole();
   FamilyRepository? _repository;
   StreamSubscription<FamilyProfile?>? _profileSubscription;
@@ -50,9 +53,11 @@ class _HomeShellState extends State<HomeShell> {
   StreamSubscription<List<ScheduleWindow>>? _schedulesSubscription;
   StreamSubscription<List<FamilyStatsEntry>>? _statsSubscription;
   StreamSubscription<CallSession?>? _callSubscription;
+  StreamSubscription<PlaySession?>? _playSubscription;
   bool _childWallActive = true;
   bool _cameraOn = false;
   CallSession _call = DemoFamilyData.initialCall;
+  late PlaySession _playSession;
   late List<FamilyMember> _members;
   late List<FamilyContact> _contacts;
   late List<ScheduleWindow> _schedules;
@@ -78,6 +83,7 @@ class _HomeShellState extends State<HomeShell> {
     _contacts = usePreviewData ? DemoFamilyData.contacts : const [];
     _schedules = usePreviewData ? DemoFamilyData.schedules : const [];
     _statsEvents = usePreviewData ? DemoFamilyData.statsEvents : const [];
+    _playSession = PlaySession.idle(id: _playRoomId, familyId: _familyId);
     _childWallActive = widget.session?.profile.childWallActive ?? true;
     _repository = widget.firebaseStatus.isReady && widget.session != null
         ? FirestoreFamilyRepository()
@@ -100,6 +106,9 @@ class _HomeShellState extends State<HomeShell> {
     _callSubscription = _repository
         ?.watchCall(_familyId, _callRoomId)
         .listen(_applyRemoteCall);
+    _playSubscription = _repository
+        ?.watchPlaySession(_familyId, _playRoomId)
+        .listen(_applyRemotePlaySession);
   }
 
   @override
@@ -110,6 +119,7 @@ class _HomeShellState extends State<HomeShell> {
     _schedulesSubscription?.cancel();
     _statsSubscription?.cancel();
     _callSubscription?.cancel();
+    _playSubscription?.cancel();
     super.dispose();
   }
 
@@ -277,6 +287,42 @@ class _HomeShellState extends State<HomeShell> {
     _saveCall(endedCall);
   }
 
+  void _sendPlayPrompt(PlayActivity activity, String targetKey) {
+    final actorId = widget.session?.uid ?? 'preview-family';
+    final nextSession = PlaySession.prompt(
+      id: _playRoomId,
+      familyId: _familyId,
+      activity: activity,
+      targetKey: targetKey,
+      createdBy: actorId,
+    );
+
+    setState(() => _playSession = nextSession);
+    _savePlaySession(nextSession);
+  }
+
+  void _answerPlayPrompt(String responseKey) {
+    if (!_playSession.isPrompting) {
+      return;
+    }
+
+    final nextSession = _playSession.answeredBy(responseKey);
+    setState(() => _playSession = nextSession);
+    _savePlaySession(nextSession);
+  }
+
+  void _clearPlayPrompt() {
+    final actorId = widget.session?.uid ?? 'preview-family';
+    final nextSession = PlaySession.idle(
+      id: _playRoomId,
+      familyId: _familyId,
+      createdBy: actorId,
+    );
+
+    setState(() => _playSession = nextSession);
+    _savePlaySession(nextSession);
+  }
+
   String _contactIdForCallStats(CallSession call) {
     return call.isCallingChildWall ? call.callerDeviceId : call.calleeDeviceId;
   }
@@ -361,6 +407,7 @@ class _HomeShellState extends State<HomeShell> {
       _childWallActive = false;
       _cameraOn = false;
       _call = DemoFamilyData.initialCall;
+      _playSession = PlaySession.idle(id: _playRoomId, familyId: _familyId);
       _contacts = const [];
       _schedules = const [];
       _statsEvents = const [];
@@ -421,6 +468,14 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  void _applyRemotePlaySession(PlaySession? remoteSession) {
+    if (!mounted || remoteSession == null) {
+      return;
+    }
+
+    setState(() => _playSession = remoteSession);
+  }
+
   void _saveCall(CallSession call) {
     final repository = _repository;
     if (repository == null) {
@@ -437,6 +492,14 @@ class _HomeShellState extends State<HomeShell> {
     unawaited(repository.recordStatsEntry(_familyId, entry));
   }
 
+  void _savePlaySession(PlaySession session) {
+    final repository = _repository;
+    if (repository == null) {
+      return;
+    }
+    unawaited(repository.savePlaySession(session));
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = context.t;
@@ -449,8 +512,10 @@ class _HomeShellState extends State<HomeShell> {
         cameraOn: _cameraOn,
         contacts: _contacts,
         call: _call,
+        playSession: _playSession,
         onContactPressed: _recordTap,
         onEndCall: _endCall,
+        onPlayAnswer: _answerPlayPrompt,
         onSignOut: widget.onSignOut,
       ),
       AppRole.parent => ParentControlScreen(
@@ -489,10 +554,13 @@ class _HomeShellState extends State<HomeShell> {
         currentUserId: widget.session?.uid,
         childWallActive: _childWallActive,
         activeCall: _call,
+        playSession: _playSession,
         cameraOn: _cameraOn,
         contacts: _contacts,
         onStartCallToChild: _startRelativeCallToChild,
         onEndCall: _endCall,
+        onSendPlayPrompt: _sendPlayPrompt,
+        onClearPlay: _clearPlayPrompt,
         onSignOut: widget.onSignOut,
       ),
     };

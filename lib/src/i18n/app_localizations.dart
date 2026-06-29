@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/call_session.dart';
 import '../domain/family_membership.dart';
+import '../domain/play_session.dart';
 import '../webrtc/web_rtc_call_controller.dart';
 
 enum AppLanguage {
@@ -597,6 +598,75 @@ class AppStrings {
     'Sljedeće dolaze kontrole za prihvatanje i odbijanje poziva.',
     'Als Nächstes kommen Annehmen- und Ablehnen-Steuerungen.',
   );
+
+  String get playroom => _pick('Playroom', 'Igraonica', 'Spielzimmer');
+  String get clearPlay => _pick('Clear play', 'Očisti igru', 'Spiel leeren');
+  String get playroomReady => _pick(
+    'Ready for a little play.',
+    'Spremno za malu igru.',
+    'Bereit für ein kleines Spiel.',
+  );
+  String playActivityLabel(PlayActivity activity) => switch (activity) {
+    PlayActivity.colorPop => _pick('Colors', 'Boje', 'Farben'),
+    PlayActivity.findShape => _pick('Shapes', 'Oblici', 'Formen'),
+    PlayActivity.peekabooBox => _pick('Boxes', 'Kutije', 'Boxen'),
+  };
+  String playTargetLabel(String key) => switch (key) {
+    'red' => _pick('Red', 'Crvena', 'Rot'),
+    'yellow' => _pick('Yellow', 'Žuta', 'Gelb'),
+    'blue' => _pick('Blue', 'Plava', 'Blau'),
+    'green' => _pick('Green', 'Zelena', 'Grün'),
+    'circle' => _pick('Circle', 'Krug', 'Kreis'),
+    'star' => _pick('Star', 'Zvijezda', 'Stern'),
+    'triangle' => _pick('Triangle', 'Trougao', 'Dreieck'),
+    'box1' => _pick('Box 1', 'Kutija 1', 'Box 1'),
+    'box2' => _pick('Box 2', 'Kutija 2', 'Box 2'),
+    'box3' => _pick('Box 3', 'Kutija 3', 'Box 3'),
+    _ => key,
+  };
+  String playWallPrompt(PlayActivity activity, String target) =>
+      switch (activity) {
+        PlayActivity.colorPop => _pick(
+          'Touch $target',
+          'Dodirni $target',
+          'Tippe $target',
+        ),
+        PlayActivity.findShape => _pick(
+          'Find $target',
+          'Nađi $target',
+          'Finde $target',
+        ),
+        PlayActivity.peekabooBox => _pick(
+          'Open $target',
+          'Otvori $target',
+          'Öffne $target',
+        ),
+      };
+  String playWallCorrect(String target) =>
+      _pick('$target!', '$target!', '$target!');
+  String get playWallTryAgain =>
+      _pick('Good try!', 'Dobar pokušaj!', 'Gut versucht!');
+  String playWaitingForChild(String target) => _pick(
+    'Waiting for child to touch $target.',
+    'Čekam da dijete dodirne $target.',
+    'Warte, bis das Kind $target antippt.',
+  );
+  String playChildAnswered(String target, bool correct) {
+    if (target.trim().isEmpty) {
+      return playroomReady;
+    }
+    return correct
+        ? _pick(
+            'Child found $target.',
+            'Dijete je našlo $target.',
+            'Kind hat $target gefunden.',
+          )
+        : _pick(
+            'Child touched $target.',
+            'Dijete je dodirnulo $target.',
+            'Kind hat $target angetippt.',
+          );
+  }
 
   String get hangUp => _pick('Hang up', 'Prekini', 'Auflegen');
   String get firebaseSignalingOffline => _pick(

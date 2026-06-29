@@ -6,6 +6,7 @@ import '../domain/family_contact.dart';
 import '../domain/family_membership.dart';
 import '../domain/family_profile.dart';
 import '../domain/family_stats.dart';
+import '../domain/play_session.dart';
 import '../domain/schedule_window.dart';
 import 'demo_family_data.dart';
 
@@ -17,6 +18,7 @@ abstract interface class FamilyRepository {
   Stream<List<ScheduleWindow>> watchSchedules(String familyId);
   Stream<List<FamilyStatsEntry>> watchStats(String familyId);
   Stream<CallSession?> watchCall(String familyId, String callId);
+  Stream<PlaySession?> watchPlaySession(String familyId, String playSessionId);
   Future<FamilyMembership> createFamily({
     required String uid,
     required String email,
@@ -31,6 +33,7 @@ abstract interface class FamilyRepository {
     required FamilyRole role,
   });
   Future<void> saveCall(CallSession call);
+  Future<void> savePlaySession(PlaySession session);
   Future<void> setChildWallActive({
     required String familyId,
     required bool active,
@@ -172,6 +175,20 @@ class FirestoreFamilyRepository implements FamilyRepository {
   }
 
   @override
+  Stream<PlaySession?> watchPlaySession(String familyId, String playSessionId) {
+    return _subcollection(
+      familyId,
+      'playSessions',
+    ).doc(playSessionId).snapshots().map((doc) {
+      final data = doc.data();
+      if (data == null) {
+        return null;
+      }
+      return PlaySession.fromJson(doc.id, data);
+    });
+  }
+
+  @override
   Future<FamilyMembership> createFamily({
     required String uid,
     required String email,
@@ -291,6 +308,14 @@ class FirestoreFamilyRepository implements FamilyRepository {
   }
 
   @override
+  Future<void> savePlaySession(PlaySession session) {
+    return _subcollection(
+      session.familyId,
+      'playSessions',
+    ).doc(session.id).set(session.toJson(), SetOptions(merge: true));
+  }
+
+  @override
   Future<void> setChildWallActive({
     required String familyId,
     required bool active,
@@ -318,6 +343,7 @@ class FirestoreFamilyRepository implements FamilyRepository {
     await _deleteCollection(_subcollection(profile.id, 'contacts'));
     await _deleteCollection(_subcollection(profile.id, 'schedules'));
     await _deleteCollection(_subcollection(profile.id, 'stats'));
+    await _deleteCollection(_subcollection(profile.id, 'playSessions'));
     await _deleteDocuments(calls.docs.map((doc) => doc.reference));
 
     for (final memberDoc in members.docs) {
