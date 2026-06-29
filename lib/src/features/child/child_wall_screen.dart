@@ -1,0 +1,278 @@
+import 'package:flutter/material.dart';
+
+import '../../domain/call_session.dart';
+import '../../domain/family_contact.dart';
+import '../../i18n/app_localizations.dart';
+import '../../webrtc/firestore_signaling_service.dart';
+import '../shared/camera_on_frame.dart';
+import '../shared/family_hearth_mark.dart';
+import '../shared/web_rtc_call_view.dart';
+import 'contact_tile.dart';
+
+class ChildWallScreen extends StatelessWidget {
+  const ChildWallScreen({
+    super.key,
+    required this.firebaseReady,
+    required this.familyId,
+    required this.active,
+    required this.cameraOn,
+    required this.contacts,
+    required this.call,
+    required this.onContactPressed,
+    required this.onEndCall,
+  });
+
+  final bool firebaseReady;
+  final String familyId;
+  final bool active;
+  final bool cameraOn;
+  final List<FamilyContact> contacts;
+  final CallSession call;
+  final ValueChanged<FamilyContact> onContactPressed;
+  final VoidCallback onEndCall;
+
+  @override
+  Widget build(BuildContext context) {
+    return CameraOnFrame(
+      active: cameraOn,
+      child: active
+          ? _ActiveWall(
+              firebaseReady: firebaseReady,
+              familyId: familyId,
+              contacts: contacts,
+              call: call,
+              onContactPressed: onContactPressed,
+              onEndCall: onEndCall,
+            )
+          : const _DimWall(),
+    );
+  }
+}
+
+class _DimWall extends StatelessWidget {
+  const _DimWall();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF090B0D),
+      child: Center(
+        child: Opacity(
+          opacity: 0.28,
+          child: FamilyHearthMark(
+            size: 180,
+            color: Colors.white,
+            flameColor: const Color(0xFFFFB545),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveWall extends StatelessWidget {
+  const _ActiveWall({
+    required this.firebaseReady,
+    required this.familyId,
+    required this.contacts,
+    required this.call,
+    required this.onContactPressed,
+    required this.onEndCall,
+  });
+
+  final bool firebaseReady;
+  final String familyId;
+  final List<FamilyContact> contacts;
+  final CallSession call;
+  final ValueChanged<FamilyContact> onContactPressed;
+  final VoidCallback onEndCall;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeCall = call.isActiveMedia;
+    final calledContact = _contactForCall(call, contacts);
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: Color(0xFFFFF7EC)),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: CustomPaint(painter: _WallBackdrop())),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 700;
+                  final columns = constraints.maxWidth > 1100
+                      ? 4
+                      : constraints.maxWidth > 760
+                      ? 3
+                      : constraints.maxWidth > 540
+                      ? 2
+                      : 1;
+                  final tileAspect = constraints.maxWidth > 1100
+                      ? 0.72
+                      : isCompact
+                      ? 0.82
+                      : 0.8;
+
+                  return GridView.builder(
+                    padding: EdgeInsets.zero,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisSpacing: 18,
+                      crossAxisSpacing: 18,
+                      childAspectRatio: tileAspect,
+                    ),
+                    itemCount: contacts.length,
+                    itemBuilder: (context, index) {
+                      final contact = contacts[index];
+                      return ContactTile(
+                        contact: contact,
+                        enabled: !activeCall,
+                        onPressed: () => onContactPressed(contact),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+          if (activeCall)
+            Positioned.fill(
+              child: _CallingOverlay(
+                firebaseReady: firebaseReady,
+                familyId: familyId,
+                call: call,
+                contact: calledContact,
+                onEndCall: onEndCall,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  FamilyContact? _contactForCall(
+    CallSession call,
+    List<FamilyContact> contacts,
+  ) {
+    final contactId = call.isCallingChildWall
+        ? call.callerDeviceId
+        : call.calleeDeviceId;
+    for (final contact in contacts) {
+      if (contact.id == contactId) {
+        return contact;
+      }
+    }
+    return null;
+  }
+}
+
+class _CallingOverlay extends StatelessWidget {
+  const _CallingOverlay({
+    required this.firebaseReady,
+    required this.familyId,
+    required this.call,
+    required this.contact,
+    required this.onEndCall,
+  });
+
+  final bool firebaseReady;
+  final String familyId;
+  final CallSession call;
+  final FamilyContact? contact;
+  final VoidCallback onEndCall;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(contact?.accentColorValue ?? 0xFFE85D43);
+    final strings = context.t;
+    final role = call.isCallingChildWall
+        ? WebRtcPeerRole.callee
+        : WebRtcPeerRole.caller;
+
+    return ColoredBox(
+      color: const Color(0xE61B1613),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 88, 22, 22),
+          child: WebRtcCallView(
+            firebaseReady: firebaseReady,
+            familyId: familyId,
+            roomId: call.id,
+            sessionId: _sessionIdFor(call),
+            role: role,
+            title: contact == null
+                ? strings.familyIsHere
+                : contact!.displayName,
+            accent: accent,
+            onEndCall: onEndCall,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _sessionIdFor(CallSession call) {
+    return '${call.id}-${call.createdAt.millisecondsSinceEpoch}';
+  }
+}
+
+class _WallBackdrop extends CustomPainter {
+  const _WallBackdrop();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    paint.color = const Color(0xFFFFE2BF);
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, size.height * 0.12)
+        ..quadraticBezierTo(
+          size.width * 0.35,
+          size.height * 0.02,
+          size.width,
+          size.height * 0.18,
+        )
+        ..lineTo(size.width, 0)
+        ..lineTo(0, 0)
+        ..close(),
+      paint,
+    );
+
+    paint.color = const Color(0xFFD9F0DF);
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, size.height * 0.78)
+        ..quadraticBezierTo(
+          size.width * 0.4,
+          size.height * 0.88,
+          size.width,
+          size.height * 0.7,
+        )
+        ..lineTo(size.width, size.height)
+        ..lineTo(0, size.height)
+        ..close(),
+      paint,
+    );
+
+    paint
+      ..color = const Color(0x22E85D43)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i < 5; i++) {
+      final y = size.height * (0.22 + i * 0.11);
+      canvas.drawLine(
+        Offset(size.width * 0.06, y),
+        Offset(size.width * 0.94, y + 20),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

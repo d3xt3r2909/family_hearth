@@ -1,0 +1,34 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "family-hearth-home",
+          "appId": "1:811520328243:android:58310bfb74df71762f5946",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "family-hearth-home",
+          "appId": "1:811520328243:ios:89400ee2f8d1657d2f5946",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "family-hearth-home",
+          "configurations": {
+            "android": "1:811520328243:android:58310bfb74df71762f5946",
+            "ios": "1:811520328243:ios:89400ee2f8d1657d2f5946",
+            "web": "1:811520328243:web:9455db0d6d24a6d12f5946"
+          }
+        }
+      }
+    }
+  }
+}

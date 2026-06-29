@@ -1,0 +1,281 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(familyId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)) &&
+        (
+          get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.status == 'approved' ||
+          get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid
+        );
+    }
+
+    function isParent(familyId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'parent' &&
+        (
+          get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.status == 'approved' ||
+          get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid
+        );
+    }
+
+    function isChildWall(familyId) {
+      return isMember(familyId) &&
+        get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'childWall';
+    }
+
+    function hasSelfMemberRecord(familyId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    function validInviteFor(familyId) {
+      return signedIn() &&
+        request.resource.data.inviteCode is string &&
+        exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)) &&
+        get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.familyId == familyId &&
+        get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.isActive == true;
+    }
+
+    function canCreateSelfMember(familyId, memberId) {
+      return signedIn() &&
+        memberId == request.auth.uid &&
+        request.resource.data.uid == request.auth.uid &&
+        (
+          (
+            get(/databases/$(database)/documents/families/$(familyId)).data.ownerId == request.auth.uid &&
+            request.resource.data.role == 'parent' &&
+            request.resource.data.status == 'approved'
+          ) ||
+          (
+            validInviteFor(familyId) &&
+            request.resource.data.role in ['parent', 'relative', 'childWall'] &&
+            request.resource.data.status == 'pending'
+          )
+        );
+    }
+
+    function callCoreFields() {
+      return [
+        'familyId',
+        'callerDeviceId',
+        'calleeDeviceId',
+        'status',
+        'activeEndpoint',
+        'createdAt',
+        'updatedAt',
+      ];
+    }
+
+    function callRtcFields() {
+      return ['rtcSessionId', 'offer', 'answer', 'rtcUpdatedAt'];
+    }
+
+    function callAllFields() {
+      return [
+        'familyId',
+        'callerDeviceId',
+        'calleeDeviceId',
+        'status',
+        'activeEndpoint',
+        'createdAt',
+        'updatedAt',
+        'rtcSessionId',
+        'offer',
+        'answer',
+        'rtcUpdatedAt',
+      ];
+    }
+
+    function callLiveStatuses() {
+      return ['active', 'connecting', 'transferring'];
+    }
+
+    function callReusableStatuses() {
+      return ['idle', 'rejected', 'expired', 'ended'];
+    }
+
+    function isCallParticipant(familyId, data) {
+      return isMember(familyId) &&
+        (
+          data.callerDeviceId == request.auth.uid ||
+          data.calleeDeviceId == request.auth.uid ||
+          (
+            (data.callerDeviceId == 'child-wall' ||
+              data.calleeDeviceId == 'child-wall') &&
+            isChildWall(familyId)
+          ) ||
+          (
+            (data.callerDeviceId == 'parent-phone' ||
+              data.calleeDeviceId == 'parent-phone') &&
+            isParent(familyId)
+          )
+        );
+    }
+
+    function validCallCore(familyId) {
+      return request.resource.data.familyId == familyId &&
+        request.resource.data.callerDeviceId is string &&
+        request.resource.data.calleeDeviceId is string &&
+        request.resource.data.activeEndpoint in ['childWall', 'parentPhone', 'relativeDevice'] &&
+        request.resource.data.createdAt is string &&
+        request.resource.data.updatedAt is string;
+    }
+
+    function canRequestChildWallCall(familyId) {
+      return isMember(familyId) &&
+        request.resource.data.keys().hasAll(callCoreFields()) &&
+        request.resource.data.keys().hasOnly(callAllFields()) &&
+        validCallCore(familyId) &&
+        request.resource.data.callerDeviceId == request.auth.uid &&
+        request.resource.data.calleeDeviceId == 'child-wall' &&
+        request.resource.data.status == 'awaitingParentApproval' &&
+        request.resource.data.activeEndpoint == 'childWall';
+    }
+
+    function canStartChildWallCall(familyId) {
+      return isChildWall(familyId) &&
+        request.resource.data.keys().hasAll(callCoreFields()) &&
+        request.resource.data.keys().hasOnly(callAllFields()) &&
+        validCallCore(familyId) &&
+        request.resource.data.callerDeviceId == 'child-wall' &&
+        request.resource.data.status in callLiveStatuses() &&
+        request.resource.data.activeEndpoint == 'childWall';
+    }
+
+    function canCreateCall(familyId) {
+      return isParent(familyId) ||
+        canRequestChildWallCall(familyId) ||
+        canStartChildWallCall(familyId);
+    }
+
+    function canUpdateCallRequest(familyId) {
+      return resource.data.status in callReusableStatuses() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(callCoreFields()) &&
+        canRequestChildWallCall(familyId);
+    }
+
+    function canUpdateChildWallCall(familyId) {
+      return resource.data.status in callReusableStatuses() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(callCoreFields()) &&
+        canStartChildWallCall(familyId);
+    }
+
+    function canParticipantEndCall(familyId) {
+      return resource.data.status in callLiveStatuses() &&
+        isCallParticipant(familyId, resource.data) &&
+        request.resource.data.status == 'ended' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+    }
+
+    function canParticipantWriteRtc(familyId) {
+      return resource.data.status in callLiveStatuses() &&
+        isCallParticipant(familyId, resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(callRtcFields());
+    }
+
+    function canWriteCall(familyId) {
+      return isParent(familyId) ||
+        canUpdateCallRequest(familyId) ||
+        canUpdateChildWallCall(familyId) ||
+        canParticipantEndCall(familyId) ||
+        canParticipantWriteRtc(familyId);
+    }
+
+    function canWriteCallCandidate(familyId, callId) {
+      return isCallParticipant(
+          familyId,
+          get(/databases/$(database)/documents/families/$(familyId)/calls/$(callId)).data
+        ) &&
+        get(/databases/$(database)/documents/families/$(familyId)/calls/$(callId)).data.status in callLiveStatuses();
+    }
+
+    match /families/{familyId} {
+      allow get, list: if isMember(familyId);
+      allow create: if signedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+      allow update: if isParent(familyId) &&
+        request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isParent(familyId);
+
+      match /members/{memberId} {
+        allow get, list: if isMember(familyId);
+        allow create: if canCreateSelfMember(familyId, memberId) ||
+          isParent(familyId);
+        allow update: if isParent(familyId) ||
+          (
+            signedIn() &&
+            memberId == request.auth.uid &&
+            request.resource.data.role == resource.data.role &&
+            request.resource.data.status == resource.data.status
+          );
+        allow delete: if isParent(familyId) ||
+          (signedIn() && memberId == request.auth.uid);
+      }
+
+      match /contacts/{contactId} {
+        allow read: if isMember(familyId);
+        allow write: if isParent(familyId);
+      }
+
+      match /schedules/{scheduleId} {
+        allow read: if isMember(familyId);
+        allow write: if isParent(familyId);
+      }
+
+      match /stats/{statId} {
+        allow read: if isMember(familyId);
+        allow create: if isMember(familyId);
+        allow update, delete: if isParent(familyId);
+      }
+
+      match /calls/{callId} {
+        allow read: if isMember(familyId);
+        allow create: if canCreateCall(familyId);
+        allow update: if canWriteCall(familyId);
+        allow delete: if isParent(familyId);
+
+        match /callerCandidates/{candidateId} {
+          allow read, write: if canWriteCallCandidate(familyId, callId);
+        }
+
+        match /calleeCandidates/{candidateId} {
+          allow read, write: if canWriteCallCandidate(familyId, callId);
+        }
+      }
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && userId == request.auth.uid;
+
+      match /families/{familyId} {
+        allow read: if signedIn() && userId == request.auth.uid;
+        allow create, update: if (
+          signedIn() &&
+          userId == request.auth.uid &&
+          hasSelfMemberRecord(familyId)
+        ) || isParent(familyId);
+        allow delete: if (signedIn() && userId == request.auth.uid) ||
+          isParent(familyId);
+      }
+    }
+
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() &&
+        request.resource.data.familyId is string &&
+        isParent(request.resource.data.familyId);
+      allow update: if signedIn() &&
+        resource.data.familyId == request.resource.data.familyId &&
+        isParent(resource.data.familyId);
+      allow delete: if signedIn() && isParent(resource.data.familyId);
+    }
+  }
+}
