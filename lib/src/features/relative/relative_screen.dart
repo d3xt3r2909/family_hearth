@@ -25,6 +25,8 @@ class RelativeScreen extends StatelessWidget {
     required this.onStartCallToChild,
     required this.onEndCall,
     required this.onSendPlayPrompt,
+    required this.onPlayBoardStroke,
+    required this.onClearPlayBoard,
     required this.onClearPlay,
     this.onSignOut,
   });
@@ -40,6 +42,8 @@ class RelativeScreen extends StatelessWidget {
   final VoidCallback onStartCallToChild;
   final VoidCallback onEndCall;
   final void Function(PlayActivity activity, String targetKey) onSendPlayPrompt;
+  final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final VoidCallback onClearPlayBoard;
   final VoidCallback onClearPlay;
   final VoidCallback? onSignOut;
 
@@ -201,7 +205,10 @@ class RelativeScreen extends StatelessWidget {
                                 RelativePlayroomPanel(
                                   enabled: childWallActive && firebaseReady,
                                   session: playSession,
+                                  actorId: currentUserId ?? 'relative-device',
                                   onSendPrompt: onSendPlayPrompt,
+                                  onBoardStroke: onPlayBoardStroke,
+                                  onClearBoard: onClearPlayBoard,
                                   onClear: onClearPlay,
                                 ),
                               ],

@@ -295,7 +295,24 @@ class _HomeShellState extends State<HomeShell> {
       activity: activity,
       targetKey: targetKey,
       createdBy: actorId,
+      boardStrokes: _playSession.boardStrokes,
     );
+
+    setState(() => _playSession = nextSession);
+    _savePlaySession(nextSession);
+  }
+
+  void _addPlayBoardStroke(PlayBoardStroke stroke) {
+    final actorId = widget.session?.uid ?? stroke.actorId;
+    final nextSession = _playSession.withBoardStroke(stroke, actorId: actorId);
+
+    setState(() => _playSession = nextSession);
+    _savePlaySession(nextSession);
+  }
+
+  void _clearPlayBoard() {
+    final actorId = widget.session?.uid ?? 'preview-family';
+    final nextSession = _playSession.withoutBoard(actorId: actorId);
 
     setState(() => _playSession = nextSession);
     _savePlaySession(nextSession);
@@ -508,6 +525,7 @@ class _HomeShellState extends State<HomeShell> {
       AppRole.childWall => ChildWallScreen(
         firebaseReady: widget.firebaseStatus.isReady,
         familyId: _familyId,
+        currentUserId: widget.session?.uid,
         active: _childWallActive,
         cameraOn: _cameraOn,
         contacts: _contacts,
@@ -516,6 +534,7 @@ class _HomeShellState extends State<HomeShell> {
         onContactPressed: _recordTap,
         onEndCall: _endCall,
         onPlayAnswer: _answerPlayPrompt,
+        onPlayBoardStroke: _addPlayBoardStroke,
         onSignOut: widget.onSignOut,
       ),
       AppRole.parent => ParentControlScreen(
@@ -560,6 +579,8 @@ class _HomeShellState extends State<HomeShell> {
         onStartCallToChild: _startRelativeCallToChild,
         onEndCall: _endCall,
         onSendPlayPrompt: _sendPlayPrompt,
+        onPlayBoardStroke: _addPlayBoardStroke,
+        onClearPlayBoard: _clearPlayBoard,
         onClearPlay: _clearPlayPrompt,
         onSignOut: widget.onSignOut,
       ),

@@ -16,6 +16,7 @@ class ChildWallScreen extends StatelessWidget {
     super.key,
     required this.firebaseReady,
     required this.familyId,
+    this.currentUserId,
     required this.active,
     required this.cameraOn,
     required this.contacts,
@@ -24,11 +25,13 @@ class ChildWallScreen extends StatelessWidget {
     required this.onContactPressed,
     required this.onEndCall,
     required this.onPlayAnswer,
+    required this.onPlayBoardStroke,
     this.onSignOut,
   });
 
   final bool firebaseReady;
   final String familyId;
+  final String? currentUserId;
   final bool active;
   final bool cameraOn;
   final List<FamilyContact> contacts;
@@ -37,6 +40,7 @@ class ChildWallScreen extends StatelessWidget {
   final ValueChanged<FamilyContact> onContactPressed;
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
+  final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
   final VoidCallback? onSignOut;
 
   @override
@@ -50,12 +54,14 @@ class ChildWallScreen extends StatelessWidget {
                 ? _ActiveWall(
                     firebaseReady: firebaseReady,
                     familyId: familyId,
+                    currentUserId: currentUserId,
                     contacts: contacts,
                     call: call,
                     playSession: playSession,
                     onContactPressed: onContactPressed,
                     onEndCall: onEndCall,
                     onPlayAnswer: onPlayAnswer,
+                    onPlayBoardStroke: onPlayBoardStroke,
                   )
                 : const _DimWall(),
           ),
@@ -139,22 +145,26 @@ class _ActiveWall extends StatelessWidget {
   const _ActiveWall({
     required this.firebaseReady,
     required this.familyId,
+    required this.currentUserId,
     required this.contacts,
     required this.call,
     required this.playSession,
     required this.onContactPressed,
     required this.onEndCall,
     required this.onPlayAnswer,
+    required this.onPlayBoardStroke,
   });
 
   final bool firebaseReady;
   final String familyId;
+  final String? currentUserId;
   final List<FamilyContact> contacts;
   final CallSession call;
   final PlaySession playSession;
   final ValueChanged<FamilyContact> onContactPressed;
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
+  final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
 
   @override
   Widget build(BuildContext context) {
@@ -215,15 +225,19 @@ class _ActiveWall extends StatelessWidget {
                 call: call,
                 contact: calledContact,
                 playSession: playSession,
+                currentUserId: currentUserId,
                 onEndCall: onEndCall,
                 onPlayAnswer: onPlayAnswer,
+                onPlayBoardStroke: onPlayBoardStroke,
               ),
             ),
-          if (!activeCall && playSession.hasPrompt)
+          if (!activeCall && playSession.hasPlaySurface)
             Positioned.fill(
               child: ChildPlaySurface(
                 session: playSession,
                 onAnswer: onPlayAnswer,
+                onBoardStroke: onPlayBoardStroke,
+                actorId: currentUserId ?? 'child-wall',
                 playfulButton: true,
               ),
             ),
@@ -255,8 +269,10 @@ class _CallingOverlay extends StatelessWidget {
     required this.call,
     required this.contact,
     required this.playSession,
+    required this.currentUserId,
     required this.onEndCall,
     required this.onPlayAnswer,
+    required this.onPlayBoardStroke,
   });
 
   final bool firebaseReady;
@@ -264,8 +280,10 @@ class _CallingOverlay extends StatelessWidget {
   final CallSession call;
   final FamilyContact? contact;
   final PlaySession playSession;
+  final String? currentUserId;
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
+  final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
 
   @override
   Widget build(BuildContext context) {
@@ -283,7 +301,7 @@ class _CallingOverlay extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                child: playSession.hasPrompt
+                child: playSession.hasPlaySurface
                     ? _CallPlaySplit(
                         callView: WebRtcCallView(
                           firebaseReady: firebaseReady,
@@ -300,6 +318,8 @@ class _CallingOverlay extends StatelessWidget {
                         playSurface: ChildPlaySurface(
                           session: playSession,
                           onAnswer: onPlayAnswer,
+                          onBoardStroke: onPlayBoardStroke,
+                          actorId: currentUserId ?? 'child-wall',
                           overlay: true,
                           playfulButton: true,
                         ),

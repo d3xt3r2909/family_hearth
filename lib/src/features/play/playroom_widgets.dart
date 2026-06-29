@@ -12,12 +12,16 @@ class ChildPlaySurface extends StatefulWidget {
     super.key,
     required this.session,
     required this.onAnswer,
+    this.onBoardStroke,
+    this.actorId = 'child-wall',
     this.overlay = false,
     this.playfulButton = false,
   });
 
   final PlaySession session;
   final ValueChanged<String> onAnswer;
+  final ValueChanged<PlayBoardStroke>? onBoardStroke;
+  final String actorId;
   final bool overlay;
   final bool playfulButton;
 
@@ -50,6 +54,11 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
   void dispose() {
     _buttonMotion.dispose();
     super.dispose();
+  }
+
+  void _handleBoardStroke(PlayBoardStroke stroke) {
+    _handleSurfaceTap();
+    widget.onBoardStroke?.call(stroke);
   }
 
   void _playPromptSound() {
@@ -86,7 +95,7 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    if (!session.hasPrompt) {
+    if (!session.hasPlaySurface) {
       return const SizedBox.shrink();
     }
 
@@ -101,7 +110,9 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
         borderRadius: widget.overlay
             ? BorderRadius.circular(8)
             : BorderRadius.zero,
-        onTap: session.hasPrompt ? _handleSurfaceTap : null,
+        onTap: session.hasPrompt && !session.hasBoard
+            ? _handleSurfaceTap
+            : null,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: widget.overlay
@@ -123,7 +134,19 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
           ),
           child: Stack(
             children: [
-              Positioned.fill(child: _PlaySprinkles(accent: accent)),
+              if (session.hasBoard)
+                Positioned.fill(
+                  child: _PlayBoardSurface(
+                    strokes: session.boardStrokes,
+                    actorId: widget.actorId,
+                    enabled: widget.onBoardStroke != null,
+                    onStrokeAdded: _handleBoardStroke,
+                    colorValue: 0xFF197A6E,
+                    fullBleed: true,
+                  ),
+                )
+              else
+                Positioned.fill(child: _PlaySprinkles(accent: accent)),
               Positioned.fill(
                 child: SafeArea(
                   minimum: EdgeInsets.all(widget.overlay ? 18 : 24),
@@ -134,7 +157,14 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
                           ? (compact ? 176.0 : 230.0)
                           : (compact ? 220.0 : 300.0);
 
-                      return Center(
+                      if (session.hasBoard && !session.hasPrompt) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Align(
+                        alignment: session.hasBoard
+                            ? Alignment.topCenter
+                            : Alignment.center,
                         child: SingleChildScrollView(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -152,7 +182,7 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
                                   burstIndex: _tapBurst,
                                 ),
                               ),
-                              const SizedBox(height: 22),
+                              SizedBox(height: session.hasBoard ? 12 : 22),
                               Text(
                                 answered
                                     ? strings.playWallBabyJoined
@@ -162,15 +192,27 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
                                       ),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: const Color(0xFF221B16),
+                                  color: session.hasBoard
+                                      ? Colors.white
+                                      : const Color(0xFF221B16),
                                   fontSize: widget.overlay
                                       ? (compact ? 28 : 34)
+                                      : session.hasBoard
+                                      ? (compact ? 28 : 36)
                                       : (compact ? 36 : 52),
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0,
+                                  shadows: session.hasBoard
+                                      ? const [
+                                          Shadow(
+                                            color: Color(0x99000000),
+                                            blurRadius: 12,
+                                          ),
+                                        ]
+                                      : null,
                                 ),
                               ),
-                              if (session.isPrompting) ...[
+                              if (session.isPrompting && !session.hasBoard) ...[
                                 const SizedBox(height: 12),
                                 Text(
                                   strings.playWallTapHint,
@@ -200,32 +242,30 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
   }
 }
 
-class RelativePlayroomPanel extends StatefulWidget {
+class RelativePlayroomPanel extends StatelessWidget {
   const RelativePlayroomPanel({
     super.key,
     required this.enabled,
     required this.session,
+    required this.actorId,
     required this.onSendPrompt,
+    required this.onBoardStroke,
+    required this.onClearBoard,
     required this.onClear,
   });
 
   final bool enabled;
   final PlaySession session;
+  final String actorId;
   final void Function(PlayActivity activity, String targetKey) onSendPrompt;
+  final ValueChanged<PlayBoardStroke> onBoardStroke;
+  final VoidCallback onClearBoard;
   final VoidCallback onClear;
-
-  @override
-  State<RelativePlayroomPanel> createState() => _RelativePlayroomPanelState();
-}
-
-class _RelativePlayroomPanelState extends State<RelativePlayroomPanel> {
-  PlayActivity _activity = PlayActivity.babyBeats;
 
   @override
   Widget build(BuildContext context) {
     final strings = context.t;
-    final targetKeys = PlayActivityCatalog.optionsFor(_activity);
-    final session = widget.session;
+    final promptOptions = PlayActivityCatalog.promptOptions;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,42 +286,34 @@ class _RelativePlayroomPanelState extends State<RelativePlayroomPanel> {
                 ),
               ),
             ),
-            if (session.hasPrompt)
+            if (session.hasPrompt || session.hasBoard)
               IconButton(
                 tooltip: strings.clearPlay,
-                onPressed: widget.enabled ? widget.onClear : null,
+                onPressed: enabled ? onClear : null,
                 icon: const Icon(Icons.close_rounded),
               ),
           ],
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final activity in PlayActivity.values)
-              ChoiceChip(
-                selected: _activity == activity,
-                label: Text(strings.playActivityLabel(activity)),
-                avatar: Icon(_activityIcon(activity), size: 18),
-                onSelected: widget.enabled
-                    ? (_) => setState(() => _activity = activity)
-                    : null,
-              ),
-          ],
+        const SizedBox(height: 14),
+        _RelativeBoardPanel(
+          enabled: enabled,
+          actorId: actorId,
+          strokes: session.boardStrokes,
+          onStrokeAdded: onBoardStroke,
+          onClear: onClearBoard,
         ),
         const SizedBox(height: 14),
         Wrap(
           spacing: 10,
           runSpacing: 10,
           children: [
-            for (final key in targetKeys)
+            for (final option in promptOptions)
               _RelativeMomentButton(
-                keyValue: key,
-                label: strings.playTargetLabel(key),
-                activity: _activity,
-                enabled: widget.enabled,
-                onPressed: () => widget.onSendPrompt(_activity, key),
+                keyValue: option.key,
+                label: strings.playTargetLabel(option.key),
+                activity: option.activity,
+                enabled: enabled,
+                onPressed: () => onSendPrompt(option.activity, option.key),
               ),
           ],
         ),
@@ -326,6 +358,357 @@ class _PlayroomStatus extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _RelativeBoardPanel extends StatelessWidget {
+  const _RelativeBoardPanel({
+    required this.enabled,
+    required this.actorId,
+    required this.strokes,
+    required this.onStrokeAdded,
+    required this.onClear,
+  });
+
+  final bool enabled;
+  final String actorId;
+  final List<PlayBoardStroke> strokes;
+  final ValueChanged<PlayBoardStroke> onStrokeAdded;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.auto_fix_high_rounded, color: Color(0xFF4967B1)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                strings.magicBoard,
+                style: const TextStyle(
+                  color: Color(0xFF221B16),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+            if (strokes.isNotEmpty)
+              IconButton(
+                tooltip: strings.clearBoard,
+                onPressed: enabled ? onClear : null,
+                icon: const Icon(Icons.cleaning_services_rounded),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 260,
+          child: _PlayBoardSurface(
+            strokes: strokes,
+            actorId: actorId,
+            enabled: enabled,
+            onStrokeAdded: onStrokeAdded,
+            colorValue: 0xFFE85D43,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayBoardSurface extends StatefulWidget {
+  const _PlayBoardSurface({
+    required this.strokes,
+    required this.actorId,
+    required this.enabled,
+    required this.onStrokeAdded,
+    required this.colorValue,
+    this.fullBleed = false,
+  });
+
+  final List<PlayBoardStroke> strokes;
+  final String actorId;
+  final bool enabled;
+  final ValueChanged<PlayBoardStroke> onStrokeAdded;
+  final int colorValue;
+  final bool fullBleed;
+
+  @override
+  State<_PlayBoardSurface> createState() => _PlayBoardSurfaceState();
+}
+
+class _PlayBoardSurfaceState extends State<_PlayBoardSurface> {
+  static const _minimumPointDistance = 0.009;
+
+  List<PlayBoardPoint> _draftPoints = const [];
+
+  void _beginStroke(Offset localPosition, Size size) {
+    if (!widget.enabled) {
+      return;
+    }
+    setState(() => _draftPoints = [_pointFor(localPosition, size)]);
+  }
+
+  void _appendStrokePoint(Offset localPosition, Size size) {
+    if (!widget.enabled || _draftPoints.isEmpty) {
+      return;
+    }
+
+    final nextPoint = _pointFor(localPosition, size);
+    final lastPoint = _draftPoints.last;
+    final distance = math.sqrt(
+      math.pow(nextPoint.x - lastPoint.x, 2) +
+          math.pow(nextPoint.y - lastPoint.y, 2),
+    );
+    if (distance < _minimumPointDistance) {
+      return;
+    }
+
+    setState(() => _draftPoints = [..._draftPoints, nextPoint]);
+  }
+
+  void _commitDraft() {
+    if (!widget.enabled || _draftPoints.isEmpty) {
+      setState(() => _draftPoints = const []);
+      return;
+    }
+
+    final now = DateTime.now();
+    final stroke = PlayBoardStroke(
+      id: 'stroke-${now.microsecondsSinceEpoch}',
+      actorId: widget.actorId,
+      colorValue: widget.colorValue,
+      points: _draftPoints,
+      createdAt: now,
+    );
+
+    setState(() => _draftPoints = const []);
+    widget.onStrokeAdded(stroke);
+  }
+
+  void _commitTap(Offset localPosition, Size size) {
+    if (!widget.enabled) {
+      return;
+    }
+
+    final now = DateTime.now();
+    widget.onStrokeAdded(
+      PlayBoardStroke(
+        id: 'stroke-${now.microsecondsSinceEpoch}',
+        actorId: widget.actorId,
+        colorValue: widget.colorValue,
+        points: [_pointFor(localPosition, size)],
+        createdAt: now,
+      ),
+    );
+  }
+
+  PlayBoardPoint _pointFor(Offset localPosition, Size size) {
+    final width = math.max(size.width, 1);
+    final height = math.max(size.height, 1);
+    return PlayBoardPoint(
+      x: (localPosition.dx / width).clamp(0.0, 1.0).toDouble(),
+      y: (localPosition.dy / height).clamp(0.0, 1.0).toDouble(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+
+        return MouseRegion(
+          cursor: widget.enabled
+              ? SystemMouseCursors.precise
+              : SystemMouseCursors.basic,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: widget.enabled
+                ? (details) => _commitTap(details.localPosition, size)
+                : null,
+            onPanStart: widget.enabled
+                ? (details) => _beginStroke(details.localPosition, size)
+                : null,
+            onPanUpdate: widget.enabled
+                ? (details) => _appendStrokePoint(details.localPosition, size)
+                : null,
+            onPanEnd: widget.enabled ? (_) => _commitDraft() : null,
+            onPanCancel: widget.enabled ? _commitDraft : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(widget.fullBleed ? 0 : 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBF2),
+                  borderRadius: BorderRadius.circular(widget.fullBleed ? 0 : 8),
+                  border: widget.fullBleed
+                      ? null
+                      : Border.all(color: const Color(0xFFE3D8CD)),
+                ),
+                child: CustomPaint(
+                  painter: _PlayBoardPainter(
+                    strokes: widget.strokes,
+                    draftPoints: _draftPoints,
+                    draftColorValue: widget.colorValue,
+                    fullBleed: widget.fullBleed,
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PlayBoardPainter extends CustomPainter {
+  const _PlayBoardPainter({
+    required this.strokes,
+    required this.draftPoints,
+    required this.draftColorValue,
+    required this.fullBleed,
+  });
+
+  final List<PlayBoardStroke> strokes;
+  final List<PlayBoardPoint> draftPoints;
+  final int draftColorValue;
+  final bool fullBleed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _drawBoardTexture(canvas, size);
+
+    if (strokes.isEmpty && draftPoints.isEmpty) {
+      final paint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = const Color(0xFFFFB545).withValues(alpha: 0.14);
+      _drawStar(
+        canvas,
+        size.center(Offset.zero),
+        size.shortestSide * 0.16,
+        0,
+        paint,
+      );
+    }
+
+    for (final stroke in strokes) {
+      _drawStroke(canvas, size, stroke.points, Color(stroke.colorValue));
+    }
+
+    if (draftPoints.isNotEmpty) {
+      _drawStroke(canvas, size, draftPoints, Color(draftColorValue));
+    }
+  }
+
+  void _drawBoardTexture(Canvas canvas, Size size) {
+    final background = Paint()
+      ..style = PaintingStyle.fill
+      ..color = fullBleed ? const Color(0xFFFFF7EC) : const Color(0xFFFFFBF2);
+    canvas.drawRect(Offset.zero & size, background);
+
+    final gridPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(
+        0xFFE3D8CD,
+      ).withValues(alpha: fullBleed ? 0.28 : 0.5);
+    final step = fullBleed ? 56.0 : 34.0;
+    for (var x = step; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (var y = step; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+  }
+
+  void _drawStroke(
+    Canvas canvas,
+    Size size,
+    List<PlayBoardPoint> points,
+    Color color,
+  ) {
+    if (points.isEmpty) {
+      return;
+    }
+
+    final offsets = [
+      for (final point in points)
+        Offset(point.x * size.width, point.y * size.height),
+    ];
+    final strokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = fullBleed ? 16 : 10
+      ..color = color.withValues(alpha: 0.86);
+
+    if (offsets.length == 1) {
+      final dotPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..color = color.withValues(alpha: 0.88);
+      canvas.drawCircle(offsets.single, fullBleed ? 18 : 12, dotPaint);
+      _drawStar(canvas, offsets.single, fullBleed ? 28 : 20, 0.2, dotPaint);
+      return;
+    }
+
+    final path = Path()..moveTo(offsets.first.dx, offsets.first.dy);
+    for (final offset in offsets.skip(1)) {
+      path.lineTo(offset.dx, offset.dy);
+    }
+    canvas.drawPath(path, strokePaint);
+
+    final starPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFB545).withValues(alpha: 0.92);
+    for (var index = 0; index < offsets.length; index += 8) {
+      _drawStar(
+        canvas,
+        offsets[index],
+        fullBleed ? 13 : 9,
+        index * 0.37,
+        starPaint,
+      );
+    }
+    _drawStar(canvas, offsets.last, fullBleed ? 24 : 16, 0.4, starPaint);
+  }
+
+  void _drawStar(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double rotation,
+    Paint paint,
+  ) {
+    final path = Path();
+    for (var index = 0; index < 10; index += 1) {
+      final pointRadius = index.isEven ? radius : radius * 0.48;
+      final angle = rotation - math.pi / 2 + index * math.pi / 5;
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * pointRadius;
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlayBoardPainter oldDelegate) {
+    return oldDelegate.strokes != strokes ||
+        oldDelegate.draftPoints != draftPoints ||
+        oldDelegate.draftColorValue != draftColorValue ||
+        oldDelegate.fullBleed != fullBleed;
   }
 }
 
@@ -880,7 +1263,6 @@ class _PlaySprinklesPainter extends CustomPainter {
 
 IconData _activityIcon(PlayActivity activity) => switch (activity) {
   PlayActivity.babyBeats => Icons.graphic_eq_rounded,
-  PlayActivity.peekaboo => Icons.face_rounded,
   PlayActivity.bubbles => Icons.bubble_chart_rounded,
   PlayActivity.clapAlong => Icons.waving_hand_rounded,
   PlayActivity.animalSounds => Icons.pets_rounded,
@@ -891,15 +1273,10 @@ IconData _iconFor(PlayActivity activity, String key) {
     'boom' => Icons.radio_button_checked_rounded,
     'ding' => Icons.notifications_rounded,
     'whoosh' => Icons.air_rounded,
-    'peekaboo' => Icons.face_rounded,
     'hello' => Icons.waving_hand_rounded,
     'smile' => Icons.sentiment_very_satisfied_rounded,
     'bubbles' => Icons.bubble_chart_rounded,
-    'stars' => Icons.star_rounded,
-    'rainbow' => Icons.auto_awesome_rounded,
     'clap' => Icons.front_hand_rounded,
-    'wave' => Icons.waving_hand_rounded,
-    'dance' => Icons.directions_run_rounded,
     'dog' || 'cat' || 'cow' => Icons.pets_rounded,
     _ => _activityIcon(activity),
   };
@@ -909,15 +1286,10 @@ Color _colorForKey(String key) => switch (key) {
   'boom' => const Color(0xFFE85D43),
   'ding' => const Color(0xFFFFB545),
   'whoosh' => const Color(0xFF4967B1),
-  'peekaboo' => const Color(0xFFE85D43),
   'hello' => const Color(0xFF197A6E),
   'smile' => const Color(0xFFFFB545),
   'bubbles' => const Color(0xFF4967B1),
-  'stars' => const Color(0xFFFFB545),
-  'rainbow' => const Color(0xFFE85D43),
   'clap' => const Color(0xFFE85D43),
-  'wave' => const Color(0xFF197A6E),
-  'dance' => const Color(0xFF4967B1),
   'dog' => const Color(0xFF197A6E),
   'cat' => const Color(0xFFE85D43),
   'cow' => const Color(0xFF4967B1),

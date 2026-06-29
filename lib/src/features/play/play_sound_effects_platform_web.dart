@@ -6,8 +6,23 @@ import 'package:web/web.dart' as web;
 
 web.AudioContext? _context;
 final _noiseRandom = math.Random();
+final Map<String, web.HTMLAudioElement> _audioPlayers = {};
+
+const Map<String, String> _audioAssets = {
+  'dog': 'assets/assets/audio/animals/dog.mp3',
+  'cat': 'assets/assets/audio/animals/cat.mp3',
+  'cow': 'assets/assets/audio/animals/cow.mp3',
+  'tap': 'assets/assets/audio/effects/tap.mp3',
+  'bubble': 'assets/assets/audio/effects/bubble.mp3',
+  'clap': 'assets/assets/audio/effects/clap.mp3',
+  'chime': 'assets/assets/audio/effects/chime.mp3',
+};
 
 Future<void> playPlatformTone(String tone) async {
+  if (await _playAudioAsset(tone)) {
+    return;
+  }
+
   final context = _context ??= web.AudioContext();
 
   try {
@@ -36,10 +51,7 @@ Future<void> playPlatformTone(String tone) async {
         delay: 0.06,
       );
     case 'whoosh':
-      _slide(context, from: 220, to: 720, duration: 0.28, volume: 0.18);
-    case 'peekaboo':
-      _tone(context, frequency: 440, duration: 0.1, volume: 0.18);
-      _tone(context, frequency: 660, duration: 0.16, volume: 0.22, delay: 0.11);
+      _whoosh(context);
     case 'hello':
       _tone(context, frequency: 520, duration: 0.12, volume: 0.18);
       _tone(context, frequency: 700, duration: 0.18, volume: 0.20, delay: 0.12);
@@ -54,8 +66,6 @@ Future<void> playPlatformTone(String tone) async {
       );
     case 'bubble':
       _slide(context, from: 360, to: 760, duration: 0.14, volume: 0.15);
-    case 'bubbleHigh':
-      _slide(context, from: 520, to: 1040, duration: 0.14, volume: 0.12);
     case 'clap':
       _tone(
         context,
@@ -86,31 +96,22 @@ Future<void> playPlatformTone(String tone) async {
 }
 
 void _dogBark(web.AudioContext context) {
-  _noiseBurst(context, duration: 0.075, volume: 0.28, frequency: 720, q: 2.8);
-  _slide(
+  _noiseBurst(
     context,
-    from: 250,
-    to: 92,
-    duration: 0.13,
-    volume: 0.30,
-    wave: 'sawtooth',
+    duration: 0.11,
+    volume: 0.25,
+    frequency: 280,
+    q: 0.65,
+    filterType: 'lowpass',
   );
   _noiseBurst(
     context,
-    delay: 0.14,
-    duration: 0.065,
-    volume: 0.22,
-    frequency: 620,
-    q: 2.4,
-  );
-  _slide(
-    context,
-    from: 205,
-    to: 82,
-    duration: 0.12,
-    volume: 0.24,
-    delay: 0.14,
-    wave: 'square',
+    delay: 0.12,
+    duration: 0.09,
+    volume: 0.20,
+    frequency: 250,
+    q: 0.75,
+    filterType: 'lowpass',
   );
 }
 
@@ -160,6 +161,17 @@ void _cowMoo(web.AudioContext context) {
     volume: 0.14,
     delay: 0.24,
     wave: 'triangle',
+  );
+}
+
+void _whoosh(web.AudioContext context) {
+  _noiseSweep(
+    context,
+    duration: 0.34,
+    volume: 0.13,
+    startFrequency: 420,
+    endFrequency: 2200,
+    q: 0.72,
   );
 }
 
@@ -242,6 +254,36 @@ void _noiseBurst(
   source.stop(now + duration + 0.02);
 }
 
+void _noiseSweep(
+  web.AudioContext context, {
+  required num duration,
+  required num volume,
+  required num startFrequency,
+  required num endFrequency,
+  required num q,
+  num delay = 0,
+}) {
+  final now = context.currentTime + delay;
+  final source = context.createBufferSource();
+  final filter = context.createBiquadFilter();
+  final gain = context.createGain();
+
+  source.buffer = _noiseBuffer(context, duration);
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(startFrequency, now);
+  filter.frequency.exponentialRampToValueAtTime(endFrequency, now + duration);
+  filter.Q.setValueAtTime(q, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(context.destination);
+  source.start(now);
+  source.stop(now + duration + 0.02);
+}
+
 web.AudioBuffer _noiseBuffer(web.AudioContext context, num duration) {
   final length = math.max(1, (context.sampleRate * duration).ceil());
   final buffer = context.createBuffer(1, length, context.sampleRate);
@@ -256,4 +298,27 @@ web.AudioBuffer _noiseBuffer(web.AudioContext context, num duration) {
   }
 
   return buffer;
+}
+
+Future<bool> _playAudioAsset(String tone) async {
+  final assetPath = _audioAssets[tone];
+  if (assetPath == null) {
+    return false;
+  }
+
+  final player = _audioPlayers.putIfAbsent(tone, () {
+    return web.HTMLAudioElement()
+      ..src = assetPath
+      ..preload = 'auto'
+      ..volume = 0.92;
+  });
+
+  try {
+    player.pause();
+    player.currentTime = 0;
+    await player.play().toDart;
+    return true;
+  } on Object {
+    return false;
+  }
 }

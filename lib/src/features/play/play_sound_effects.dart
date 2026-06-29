@@ -15,31 +15,26 @@ class PlaySoundEffects {
   }
 
   static Future<void> playBabyTouch(PlayActivity activity, String key) async {
-    await playPlatformTone('pop');
-    await Future<void>.delayed(const Duration(milliseconds: 72));
+    if (activity != PlayActivity.animalSounds) {
+      await playPlatformTone('tap');
+      await Future<void>.delayed(const Duration(milliseconds: 72));
+    }
+
     await playMoment(activity, key);
   }
 
   static List<String> _tonesFor(PlayActivity activity, String key) {
     return switch (key) {
       'boom' => const ['boom'],
-      'ding' => const ['ding'],
+      'ding' => const ['chime'],
       'whoosh' => const ['whoosh'],
-      'peekaboo' => const ['peekaboo'],
-      'hello' => const ['hello'],
-      'smile' => const ['sparkle'],
-      'bubbles' => const ['bubble', 'bubbleHigh'],
-      'stars' => const ['sparkle', 'ding'],
-      'rainbow' => const ['bubble', 'sparkle', 'ding'],
-      'clap' => const ['clap', 'clap'],
-      'wave' => const ['whoosh', 'sparkle'],
-      'dance' => const ['pop', 'ding', 'pop'],
+      'bubbles' => const ['bubble'],
+      'clap' => const ['clap'],
       'dog' => const ['dog'],
       'cat' => const ['cat'],
       'cow' => const ['cow'],
       _ => switch (activity) {
         PlayActivity.babyBeats => const ['boom'],
-        PlayActivity.peekaboo => const ['peekaboo'],
         PlayActivity.bubbles => const ['bubble'],
         PlayActivity.clapAlong => const ['clap'],
         PlayActivity.animalSounds => const ['dog'],

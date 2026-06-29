@@ -601,6 +601,8 @@ class AppStrings {
 
   String get playroom => _pick('Playroom', 'Igraonica', 'Spielzimmer');
   String get clearPlay => _pick('Clear play', 'Očisti igru', 'Spiel leeren');
+  String get magicBoard => _pick('Magic board', 'Čarobna tabla', 'Zaubertafel');
+  String get clearBoard => _pick('Clear board', 'Očisti tablu', 'Tafel leeren');
   String get playroomReady => _pick(
     'Send a little moment to the wall.',
     'Pošalji mali trenutak na zid.',
@@ -608,7 +610,6 @@ class AppStrings {
   );
   String playActivityLabel(PlayActivity activity) => switch (activity) {
     PlayActivity.babyBeats => _pick('Boom', 'Bum', 'Bumm'),
-    PlayActivity.peekaboo => _pick('Peekaboo', 'Kuku', 'Kuckuck'),
     PlayActivity.bubbles => _pick('Bubbles', 'Balončići', 'Blasen'),
     PlayActivity.clapAlong => _pick('Move', 'Pokret', 'Bewegen'),
     PlayActivity.animalSounds => _pick('Animals', 'Životinje', 'Tiere'),
@@ -617,15 +618,10 @@ class AppStrings {
     'boom' => _pick('Boom', 'Bum', 'Bumm'),
     'ding' => _pick('Ding', 'Ding', 'Ding'),
     'whoosh' => _pick('Whoosh', 'Fiju', 'Wusch'),
-    'peekaboo' => _pick('Peekaboo', 'Kuku', 'Kuckuck'),
     'hello' => _pick('Hello', 'Ćao', 'Hallo'),
     'smile' => _pick('Smile', 'Osmijeh', 'Lächeln'),
     'bubbles' => _pick('Bubbles', 'Balončići', 'Blasen'),
-    'stars' => _pick('Stars', 'Zvjezdice', 'Sterne'),
-    'rainbow' => _pick('Rainbow', 'Duga', 'Regenbogen'),
     'clap' => _pick('Clap', 'Pljesak', 'Klatschen'),
-    'wave' => _pick('Wave', 'Mahni', 'Winken'),
-    'dance' => _pick('Dance', 'Ples', 'Tanzen'),
     'dog' => _pick('Dog', 'Cuko', 'Hund'),
     'cat' => _pick('Cat', 'Maca', 'Katze'),
     'cow' => _pick('Cow', 'Krava', 'Kuh'),
@@ -634,7 +630,6 @@ class AppStrings {
   String playWallMoment(PlayActivity activity, String target) =>
       switch (activity) {
         PlayActivity.babyBeats => '$target!',
-        PlayActivity.peekaboo => '$target!',
         PlayActivity.bubbles => '$target!',
         PlayActivity.clapAlong => '$target!',
         PlayActivity.animalSounds => '$target!',

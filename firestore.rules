@@ -222,9 +222,15 @@ service cloud.firestore {
         'createdBy',
         'createdAt',
         'updatedAt',
+        'boardStrokes',
         'childResponseKey',
         'childResponseCorrect',
       ];
+    }
+
+    function validPlayBoard() {
+      return !request.resource.data.keys().hasAny(['boardStrokes']) ||
+        request.resource.data.boardStrokes is list;
     }
 
     function validPlayCore(familyId) {
@@ -242,7 +248,6 @@ service cloud.firestore {
         request.resource.data.familyId == familyId &&
         request.resource.data.activity in [
           'babyBeats',
-          'peekaboo',
           'bubbles',
           'clapAlong',
           'animalSounds',
@@ -252,13 +257,34 @@ service cloud.firestore {
         request.resource.data.options is list &&
         request.resource.data.createdBy is string &&
         request.resource.data.createdAt is string &&
-        request.resource.data.updatedAt is string;
+        request.resource.data.updatedAt is string &&
+        validPlayBoard();
     }
 
     function canControlPlay(familyId) {
       return validPlayCore(familyId) &&
         request.resource.data.status in ['idle', 'prompting'] &&
         (isParent(familyId) || isRelative(familyId)) &&
+        request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function canCreateDrawPlay(familyId) {
+      return validPlayCore(familyId) &&
+        isChildWall(familyId) &&
+        request.resource.data.status == 'idle' &&
+        request.resource.data.boardStrokes is list &&
+        request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function canDrawPlay(familyId) {
+      return isMember(familyId) &&
+        validPlayCore(familyId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'boardStrokes',
+          'createdBy',
+          'updatedAt',
+        ]) &&
+        request.resource.data.boardStrokes is list &&
         request.resource.data.createdBy == request.auth.uid;
     }
 
@@ -332,8 +358,10 @@ service cloud.firestore {
 
       match /playSessions/{playSessionId} {
         allow read: if isMember(familyId);
-        allow create: if canControlPlay(familyId);
-        allow update: if canControlPlay(familyId) || canAnswerPlay(familyId);
+        allow create: if canControlPlay(familyId) || canCreateDrawPlay(familyId);
+        allow update: if canControlPlay(familyId) ||
+          canDrawPlay(familyId) ||
+          canAnswerPlay(familyId);
         allow delete: if isParent(familyId);
       }
     }
