@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../domain/play_session.dart';
 import '../../i18n/app_localizations.dart';
+import 'play_sound_effects.dart';
 
-class ChildPlaySurface extends StatelessWidget {
+class ChildPlaySurface extends StatefulWidget {
   const ChildPlaySurface({
     super.key,
     required this.session,
@@ -16,7 +20,59 @@ class ChildPlaySurface extends StatelessWidget {
   final bool overlay;
 
   @override
+  State<ChildPlaySurface> createState() => _ChildPlaySurfaceState();
+}
+
+class _ChildPlaySurfaceState extends State<ChildPlaySurface> {
+  String? _lastPlayedPromptSignature;
+  int _tapBurst = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _playPromptSound());
+  }
+
+  @override
+  void didUpdateWidget(covariant ChildPlaySurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _playPromptSound();
+  }
+
+  void _playPromptSound() {
+    final session = widget.session;
+    if (!session.isPrompting) {
+      return;
+    }
+
+    final signature =
+        '${session.id}-${session.activity.name}-${session.targetKey}-${session.updatedAt.microsecondsSinceEpoch}';
+    if (signature == _lastPlayedPromptSignature) {
+      return;
+    }
+    _lastPlayedPromptSignature = signature;
+    unawaited(PlaySoundEffects.playMoment(session.activity, session.targetKey));
+  }
+
+  void _handleSurfaceTap() {
+    final session = widget.session;
+    if (!session.hasPrompt) {
+      return;
+    }
+
+    Feedback.forTap(context);
+    setState(() => _tapBurst += 1);
+    unawaited(
+      PlaySoundEffects.playBabyTouch(session.activity, session.targetKey),
+    );
+    if (session.isPrompting) {
+      widget.onAnswer(PlaySession.childTouchKey);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
     if (!session.hasPrompt) {
       return const SizedBox.shrink();
     }
@@ -29,21 +85,20 @@ class ChildPlaySurface extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: overlay ? BorderRadius.circular(8) : BorderRadius.zero,
-        onTap: session.isPrompting
-            ? () {
-                Feedback.forTap(context);
-                onAnswer(PlaySession.childTouchKey);
-              }
-            : null,
+        borderRadius: widget.overlay
+            ? BorderRadius.circular(8)
+            : BorderRadius.zero,
+        onTap: session.hasPrompt ? _handleSurfaceTap : null,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: overlay ? const Color(0xF7FFF7EC) : const Color(0xFFFFF7EC),
-            borderRadius: overlay
+            color: widget.overlay
+                ? const Color(0xF7FFF7EC)
+                : const Color(0xFFFFF7EC),
+            borderRadius: widget.overlay
                 ? BorderRadius.circular(8)
                 : BorderRadius.zero,
-            border: overlay ? Border.all(color: accent, width: 3) : null,
-            boxShadow: overlay
+            border: widget.overlay ? Border.all(color: accent, width: 3) : null,
+            boxShadow: widget.overlay
                 ? const [
                     BoxShadow(
                       color: Color(0x33000000),
@@ -58,11 +113,11 @@ class ChildPlaySurface extends StatelessWidget {
               Positioned.fill(child: _PlaySprinkles(accent: accent)),
               Positioned.fill(
                 child: SafeArea(
-                  minimum: EdgeInsets.all(overlay ? 18 : 24),
+                  minimum: EdgeInsets.all(widget.overlay ? 18 : 24),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxWidth < 520;
-                      final visualSize = overlay
+                      final visualSize = widget.overlay
                           ? (compact ? 176.0 : 230.0)
                           : (compact ? 220.0 : 300.0);
 
@@ -77,6 +132,7 @@ class ChildPlaySurface extends StatelessWidget {
                                 accent: accent,
                                 size: visualSize,
                                 answered: answered,
+                                burstIndex: _tapBurst,
                               ),
                               const SizedBox(height: 22),
                               Text(
@@ -89,7 +145,7 @@ class ChildPlaySurface extends StatelessWidget {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: const Color(0xFF221B16),
-                                  fontSize: overlay
+                                  fontSize: widget.overlay
                                       ? (compact ? 28 : 34)
                                       : (compact ? 36 : 52),
                                   fontWeight: FontWeight.w900,
@@ -105,7 +161,7 @@ class ChildPlaySurface extends StatelessWidget {
                                     color: const Color(
                                       0xFF221B16,
                                     ).withValues(alpha: 0.58),
-                                    fontSize: overlay ? 18 : 24,
+                                    fontSize: widget.overlay ? 18 : 24,
                                     fontWeight: FontWeight.w900,
                                   ),
                                 ),
@@ -282,7 +338,12 @@ class _RelativeMomentButton extends StatelessWidget {
         textStyle: const TextStyle(fontWeight: FontWeight.w900),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      onPressed: enabled ? onPressed : null,
+      onPressed: enabled
+          ? () {
+              unawaited(PlaySoundEffects.playMoment(activity, keyValue));
+              onPressed();
+            }
+          : null,
       icon: Icon(_iconFor(activity, keyValue)),
       label: Text(label),
     );
@@ -296,6 +357,7 @@ class _BabyMomentVisual extends StatelessWidget {
     required this.accent,
     required this.size,
     required this.answered,
+    required this.burstIndex,
   });
 
   final PlaySession session;
@@ -303,12 +365,13 @@ class _BabyMomentVisual extends StatelessWidget {
   final Color accent;
   final double size;
   final bool answered;
+  final int burstIndex;
 
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       key: ValueKey(
-        '${session.activity.name}-${session.targetKey}-${session.updatedAt.microsecondsSinceEpoch}-$answered',
+        '${session.activity.name}-${session.targetKey}-${session.updatedAt.microsecondsSinceEpoch}-$answered-$burstIndex',
       ),
       tween: Tween(begin: 0.86, end: 1),
       duration: const Duration(milliseconds: 520),
@@ -318,30 +381,168 @@ class _BabyMomentVisual extends StatelessWidget {
       },
       child: SizedBox.square(
         dimension: size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: answered ? const Color(0xFF197A6E) : accent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withValues(alpha: 0.32),
-                blurRadius: 34,
-                spreadRadius: 3,
-                offset: const Offset(0, 16),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: _PulseHalo(
+                accent: answered ? const Color(0xFF197A6E) : accent,
               ),
-            ],
-          ),
-          child: _MomentGraphic(
-            activity: session.activity,
-            keyValue: session.targetKey,
-            label: label,
-            foreground: _foregroundFor(
-              answered ? const Color(0xFF197A6E) : accent,
             ),
-          ),
+            Positioned.fill(
+              child: _CelebrationBurst(
+                accent: answered ? const Color(0xFF197A6E) : accent,
+                foreground: _foregroundFor(
+                  answered ? const Color(0xFF197A6E) : accent,
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: answered ? const Color(0xFF197A6E) : accent,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.32),
+                      blurRadius: 34,
+                      spreadRadius: 3,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: _MomentGraphic(
+                  activity: session.activity,
+                  keyValue: session.targetKey,
+                  label: label,
+                  foreground: _foregroundFor(
+                    answered ? const Color(0xFF197A6E) : accent,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+}
+
+class _PulseHalo extends StatelessWidget {
+  const _PulseHalo({required this.accent});
+
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 680),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 1 + value * 0.24,
+          child: Opacity(
+            opacity: 1 - value,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CelebrationBurst extends StatelessWidget {
+  const _CelebrationBurst({required this.accent, required this.foreground});
+
+  final Color accent;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 720),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return CustomPaint(
+          painter: _CelebrationBurstPainter(
+            progress: value,
+            accent: accent,
+            foreground: foreground,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CelebrationBurstPainter extends CustomPainter {
+  const _CelebrationBurstPainter({
+    required this.progress,
+    required this.accent,
+    required this.foreground,
+  });
+
+  final double progress;
+  final Color accent;
+  final Color foreground;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = math.min(size.width, size.height) * 0.68;
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (var index = 0; index < 12; index += 1) {
+      final angle = -math.pi / 2 + index * math.pi / 6;
+      final distance = maxRadius * Curves.easeOut.transform(progress);
+      final point =
+          center + Offset(math.cos(angle), math.sin(angle)) * distance;
+      final opacity = (1 - progress).clamp(0.0, 1.0);
+      final color = index.isEven ? accent : foreground;
+      paint.color = color.withValues(alpha: opacity * 0.72);
+
+      if (index % 3 == 0) {
+        _drawTriangle(canvas, point, 12 + index % 4 * 2, angle, paint);
+      } else {
+        canvas.drawCircle(point, 7 + index % 4 * 2, paint);
+      }
+    }
+  }
+
+  void _drawTriangle(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double angle,
+    Paint paint,
+  ) {
+    final path = Path();
+    for (var index = 0; index < 3; index += 1) {
+      final pointAngle = angle + index * math.pi * 2 / 3;
+      final point =
+          center + Offset(math.cos(pointAngle), math.sin(pointAngle)) * radius;
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CelebrationBurstPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.accent != accent ||
+        oldDelegate.foreground != foreground;
   }
 }
 
@@ -457,25 +658,47 @@ class _SmallCircle extends StatelessWidget {
   }
 }
 
-class _PlaySprinkles extends StatelessWidget {
+class _PlaySprinkles extends StatefulWidget {
   const _PlaySprinkles({required this.accent});
 
   final Color accent;
 
   @override
+  State<_PlaySprinkles> createState() => _PlaySprinklesState();
+}
+
+class _PlaySprinklesState extends State<_PlaySprinkles>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3600),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: _PlaySprinklesPainter(accent));
+    return CustomPaint(
+      painter: _PlaySprinklesPainter(widget.accent, _controller),
+    );
   }
 }
 
 class _PlaySprinklesPainter extends CustomPainter {
-  const _PlaySprinklesPainter(this.accent);
+  _PlaySprinklesPainter(this.accent, this.animation)
+    : super(repaint: animation);
 
   final Color accent;
+  final Animation<double> animation;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
+    final progress = animation.value * math.pi * 2;
     final marks = [
       (accent, 0.10, 0.16, 18.0),
       (const Color(0xFFFFB545), 0.84, 0.14, 22.0),
@@ -484,19 +707,47 @@ class _PlaySprinklesPainter extends CustomPainter {
       (const Color(0xFF197A6E), 0.50, 0.90, 12.0),
     ];
 
-    for (final mark in marks) {
+    for (var index = 0; index < marks.length; index += 1) {
+      final mark = marks[index];
+      final bob = math.sin(progress + index * 1.7) * 9;
+      final drift = math.cos(progress * 0.7 + index * 1.1) * 8;
       paint.color = mark.$1.withValues(alpha: 0.22);
-      canvas.drawCircle(
-        Offset(size.width * mark.$2, size.height * mark.$3),
-        mark.$4,
-        paint,
+      final center = Offset(
+        size.width * mark.$2 + drift,
+        size.height * mark.$3 + bob,
       );
+      if (index == 2) {
+        _drawSoftTriangle(canvas, center, mark.$4 + 6, progress, paint);
+      } else {
+        canvas.drawCircle(center, mark.$4, paint);
+      }
     }
+  }
+
+  void _drawSoftTriangle(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double rotation,
+    Paint paint,
+  ) {
+    final path = Path();
+    for (var index = 0; index < 3; index += 1) {
+      final angle = rotation + index * math.pi * 2 / 3;
+      final point = center + Offset(math.cos(angle), math.sin(angle)) * radius;
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant _PlaySprinklesPainter oldDelegate) {
-    return oldDelegate.accent != accent;
+    return oldDelegate.accent != accent || oldDelegate.animation != animation;
   }
 }
 
