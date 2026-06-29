@@ -3,50 +3,50 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('PlaySession', () {
-    test('creates a prompt with activity options', () {
+    test('creates a baby moment with activity options', () {
       final session = PlaySession.prompt(
         id: 'play-1',
         familyId: 'family',
-        activity: PlayActivity.findShape,
-        targetKey: 'star',
+        activity: PlayActivity.bubbles,
+        targetKey: 'bubbles',
         createdBy: 'grandma',
       );
 
       expect(session.isPrompting, isTrue);
-      expect(session.options, ['circle', 'star', 'triangle']);
+      expect(session.options, ['bubbles', 'stars', 'rainbow']);
       expect(session.childResponseKey, isNull);
     });
 
-    test('marks a matching child answer as correct', () {
+    test('records a baby touch without right or wrong', () {
       final session = PlaySession.prompt(
         id: 'play-1',
         familyId: 'family',
-        activity: PlayActivity.colorPop,
-        targetKey: 'red',
+        activity: PlayActivity.babyBeats,
+        targetKey: 'boom',
         createdBy: 'aunt',
-      ).answeredBy('red');
+      ).answeredBy(PlaySession.childTouchKey);
 
       expect(session.isAnswered, isTrue);
-      expect(session.childResponseKey, 'red');
-      expect(session.childResponseCorrect, isTrue);
+      expect(session.childResponseKey, PlaySession.childTouchKey);
+      expect(session.childResponseCorrect, isNull);
     });
 
     test('round trips through json', () {
       final session = PlaySession.prompt(
         id: 'play-1',
         familyId: 'family',
-        activity: PlayActivity.peekabooBox,
-        targetKey: 'box2',
+        activity: PlayActivity.animalSounds,
+        targetKey: 'dog',
         createdBy: 'grandpa',
-      ).answeredBy('box1');
+      ).answeredBy(PlaySession.childTouchKey);
 
       final restored = PlaySession.fromJson('play-1', session.toJson());
 
-      expect(restored.activity, PlayActivity.peekabooBox);
+      expect(restored.activity, PlayActivity.animalSounds);
       expect(restored.status, PlaySessionStatus.answered);
-      expect(restored.targetKey, 'box2');
-      expect(restored.childResponseKey, 'box1');
-      expect(restored.childResponseCorrect, isFalse);
+      expect(restored.targetKey, 'dog');
+      expect(restored.childResponseKey, PlaySession.childTouchKey);
+      expect(restored.childResponseCorrect, isNull);
     });
   });
 }

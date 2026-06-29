@@ -602,71 +602,53 @@ class AppStrings {
   String get playroom => _pick('Playroom', 'Igraonica', 'Spielzimmer');
   String get clearPlay => _pick('Clear play', 'Očisti igru', 'Spiel leeren');
   String get playroomReady => _pick(
-    'Ready for a little play.',
-    'Spremno za malu igru.',
-    'Bereit für ein kleines Spiel.',
+    'Send a little moment to the wall.',
+    'Pošalji mali trenutak na zid.',
+    'Schicke einen kleinen Moment an die Wand.',
   );
   String playActivityLabel(PlayActivity activity) => switch (activity) {
-    PlayActivity.colorPop => _pick('Colors', 'Boje', 'Farben'),
-    PlayActivity.findShape => _pick('Shapes', 'Oblici', 'Formen'),
-    PlayActivity.peekabooBox => _pick('Boxes', 'Kutije', 'Boxen'),
+    PlayActivity.babyBeats => _pick('Boom', 'Bum', 'Bumm'),
+    PlayActivity.peekaboo => _pick('Peekaboo', 'Kuku', 'Kuckuck'),
+    PlayActivity.bubbles => _pick('Bubbles', 'Balončići', 'Blasen'),
+    PlayActivity.clapAlong => _pick('Move', 'Pokret', 'Bewegen'),
+    PlayActivity.animalSounds => _pick('Animals', 'Životinje', 'Tiere'),
   };
   String playTargetLabel(String key) => switch (key) {
-    'red' => _pick('Red', 'Crvena', 'Rot'),
-    'yellow' => _pick('Yellow', 'Žuta', 'Gelb'),
-    'blue' => _pick('Blue', 'Plava', 'Blau'),
-    'green' => _pick('Green', 'Zelena', 'Grün'),
-    'circle' => _pick('Circle', 'Krug', 'Kreis'),
-    'star' => _pick('Star', 'Zvijezda', 'Stern'),
-    'triangle' => _pick('Triangle', 'Trougao', 'Dreieck'),
-    'box1' => _pick('Box 1', 'Kutija 1', 'Box 1'),
-    'box2' => _pick('Box 2', 'Kutija 2', 'Box 2'),
-    'box3' => _pick('Box 3', 'Kutija 3', 'Box 3'),
+    'boom' => _pick('Boom', 'Bum', 'Bumm'),
+    'ding' => _pick('Ding', 'Ding', 'Ding'),
+    'whoosh' => _pick('Whoosh', 'Fiju', 'Wusch'),
+    'peekaboo' => _pick('Peekaboo', 'Kuku', 'Kuckuck'),
+    'hello' => _pick('Hello', 'Ćao', 'Hallo'),
+    'smile' => _pick('Smile', 'Osmijeh', 'Lächeln'),
+    'bubbles' => _pick('Bubbles', 'Balončići', 'Blasen'),
+    'stars' => _pick('Stars', 'Zvjezdice', 'Sterne'),
+    'rainbow' => _pick('Rainbow', 'Duga', 'Regenbogen'),
+    'clap' => _pick('Clap', 'Pljesak', 'Klatschen'),
+    'wave' => _pick('Wave', 'Mahni', 'Winken'),
+    'dance' => _pick('Dance', 'Ples', 'Tanzen'),
+    'dog' => _pick('Dog', 'Cuko', 'Hund'),
+    'cat' => _pick('Cat', 'Maca', 'Katze'),
+    'cow' => _pick('Cow', 'Krava', 'Kuh'),
     _ => key,
   };
-  String playWallPrompt(PlayActivity activity, String target) =>
+  String playWallMoment(PlayActivity activity, String target) =>
       switch (activity) {
-        PlayActivity.colorPop => _pick(
-          'Touch $target',
-          'Dodirni $target',
-          'Tippe $target',
-        ),
-        PlayActivity.findShape => _pick(
-          'Find $target',
-          'Nađi $target',
-          'Finde $target',
-        ),
-        PlayActivity.peekabooBox => _pick(
-          'Open $target',
-          'Otvori $target',
-          'Öffne $target',
-        ),
+        PlayActivity.babyBeats => '$target!',
+        PlayActivity.peekaboo => '$target!',
+        PlayActivity.bubbles => '$target!',
+        PlayActivity.clapAlong => '$target!',
+        PlayActivity.animalSounds => '$target!',
       };
-  String playWallCorrect(String target) =>
-      _pick('$target!', '$target!', '$target!');
-  String get playWallTryAgain =>
-      _pick('Good try!', 'Dobar pokušaj!', 'Gut versucht!');
-  String playWaitingForChild(String target) => _pick(
-    'Waiting for child to touch $target.',
-    'Čekam da dijete dodirne $target.',
-    'Warte, bis das Kind $target antippt.',
+  String get playWallTapHint =>
+      _pick('Tap anywhere', 'Dodirni bilo gdje', 'Irgendwo tippen');
+  String get playWallBabyJoined => _pick('Again!', 'Još!', 'Nochmal!');
+  String get playWaitingForChild => _pick(
+    'Waiting for a tiny tap.',
+    'Čekam mali dodir.',
+    'Warte auf einen kleinen Tipp.',
   );
-  String playChildAnswered(String target, bool correct) {
-    if (target.trim().isEmpty) {
-      return playroomReady;
-    }
-    return correct
-        ? _pick(
-            'Child found $target.',
-            'Dijete je našlo $target.',
-            'Kind hat $target gefunden.',
-          )
-        : _pick(
-            'Child touched $target.',
-            'Dijete je dodirnulo $target.',
-            'Kind hat $target angetippt.',
-          );
-  }
+  String get playChildResponded =>
+      _pick('Baby touched it.', 'Beba je dodirnula.', 'Baby hat getippt.');
 
   String get hangUp => _pick('Hang up', 'Prekini', 'Auflegen');
   String get firebaseSignalingOffline => _pick(

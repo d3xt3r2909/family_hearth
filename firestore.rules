@@ -240,7 +240,13 @@ service cloud.firestore {
         ]) &&
         request.resource.data.keys().hasOnly(playFields()) &&
         request.resource.data.familyId == familyId &&
-        request.resource.data.activity in ['colorPop', 'findShape', 'peekabooBox'] &&
+        request.resource.data.activity in [
+          'babyBeats',
+          'peekaboo',
+          'bubbles',
+          'clapAlong',
+          'animalSounds',
+        ] &&
         request.resource.data.status in ['idle', 'prompting', 'answered'] &&
         request.resource.data.targetKey is string &&
         request.resource.data.options is list &&
@@ -249,17 +255,9 @@ service cloud.firestore {
         request.resource.data.updatedAt is string;
     }
 
-    function validAnsweredPlay() {
-      return request.resource.data.status != 'answered' ||
-        (
-          request.resource.data.childResponseKey is string &&
-          request.resource.data.childResponseCorrect is bool
-        );
-    }
-
     function canControlPlay(familyId) {
       return validPlayCore(familyId) &&
-        validAnsweredPlay() &&
+        request.resource.data.status in ['idle', 'prompting'] &&
         (isParent(familyId) || isRelative(familyId)) &&
         request.resource.data.createdBy == request.auth.uid;
     }
@@ -275,7 +273,6 @@ service cloud.firestore {
         ]) &&
         request.resource.data.status == 'answered' &&
         request.resource.data.childResponseKey is string &&
-        request.resource.data.childResponseCorrect is bool &&
         request.resource.data.updatedAt is string;
     }
 

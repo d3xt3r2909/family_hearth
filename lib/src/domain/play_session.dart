@@ -1,18 +1,22 @@
-enum PlayActivity { colorPop, findShape, peekabooBox }
+enum PlayActivity { babyBeats, peekaboo, bubbles, clapAlong, animalSounds }
 
 enum PlaySessionStatus { idle, prompting, answered }
 
 class PlayActivityCatalog {
   const PlayActivityCatalog._();
 
-  static const colorKeys = ['red', 'yellow', 'blue', 'green'];
-  static const shapeKeys = ['circle', 'star', 'triangle'];
-  static const boxKeys = ['box1', 'box2', 'box3'];
+  static const beatKeys = ['boom', 'ding', 'whoosh'];
+  static const peekabooKeys = ['peekaboo', 'hello', 'smile'];
+  static const bubbleKeys = ['bubbles', 'stars', 'rainbow'];
+  static const clapKeys = ['clap', 'wave', 'dance'];
+  static const animalKeys = ['dog', 'cat', 'cow'];
 
   static List<String> optionsFor(PlayActivity activity) => switch (activity) {
-    PlayActivity.colorPop => colorKeys,
-    PlayActivity.findShape => shapeKeys,
-    PlayActivity.peekabooBox => boxKeys,
+    PlayActivity.babyBeats => beatKeys,
+    PlayActivity.peekaboo => peekabooKeys,
+    PlayActivity.bubbles => bubbleKeys,
+    PlayActivity.clapAlong => clapKeys,
+    PlayActivity.animalSounds => animalKeys,
   };
 }
 
@@ -30,6 +34,8 @@ class PlaySession {
     this.childResponseKey,
     this.childResponseCorrect,
   });
+
+  static const childTouchKey = 'babyTouch';
 
   final String id;
   final String familyId;
@@ -59,7 +65,7 @@ class PlaySession {
     return PlaySession(
       id: id,
       familyId: familyId,
-      activity: PlayActivity.colorPop,
+      activity: PlayActivity.babyBeats,
       status: PlaySessionStatus.idle,
       targetKey: '',
       options: const [],
@@ -102,7 +108,7 @@ class PlaySession {
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       childResponseKey: responseKey,
-      childResponseCorrect: responseKey == targetKey,
+      childResponseCorrect: null,
     );
   }
 
@@ -125,7 +131,7 @@ class PlaySession {
       familyId: json['familyId'] as String? ?? '',
       activity: PlayActivity.values.firstWhere(
         (activity) => activity.name == json['activity'],
-        orElse: () => PlayActivity.colorPop,
+        orElse: () => PlayActivity.babyBeats,
       ),
       status: PlaySessionStatus.values.firstWhere(
         (status) => status.name == json['status'],
