@@ -112,8 +112,16 @@ service cloud.firestore {
             isChildWall(familyId)
           ) ||
           (
+            data.activeEndpoint == 'childWall' &&
+            isChildWall(familyId)
+          ) ||
+          (
             (data.callerDeviceId == 'parent-phone' ||
               data.calleeDeviceId == 'parent-phone') &&
+            isParent(familyId)
+          ) ||
+          (
+            data.activeEndpoint == 'parentPhone' &&
             isParent(familyId)
           )
         );
