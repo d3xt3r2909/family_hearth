@@ -7,7 +7,19 @@ import 'play_sound_effects_platform_stub.dart'
 class PlaySoundEffects {
   const PlaySoundEffects._();
 
+  static bool _enabled = true;
+
+  static bool get enabled => _enabled;
+
+  static void setEnabled(bool enabled) {
+    _enabled = enabled;
+  }
+
   static Future<void> playMoment(PlayActivity activity, String key) async {
+    if (!_enabled) {
+      return;
+    }
+
     for (final tone in _tonesFor(activity, key)) {
       await playPlatformTone(tone);
       await Future<void>.delayed(const Duration(milliseconds: 54));
@@ -15,6 +27,10 @@ class PlaySoundEffects {
   }
 
   static Future<void> playBabyTouch(PlayActivity activity, String key) async {
+    if (!_enabled) {
+      return;
+    }
+
     if (activity != PlayActivity.animalSounds) {
       await playPlatformTone('tap');
       await Future<void>.delayed(const Duration(milliseconds: 72));

@@ -9,6 +9,8 @@ import '../../i18n/app_localizations.dart';
 import '../../webrtc/firestore_signaling_service.dart';
 import '../shared/camera_on_frame.dart';
 import '../shared/family_hearth_mark.dart';
+import '../shared/language_menu.dart';
+import '../shared/sound_effects_toggle.dart';
 import '../shared/web_rtc_call_view.dart';
 import '../play/playroom_widgets.dart';
 import 'contact_tile.dart';
@@ -28,6 +30,9 @@ class ChildWallScreen extends StatelessWidget {
     required this.onEndCall,
     required this.onPlayAnswer,
     required this.onPlayBoardStroke,
+    required this.onPlayBoardSticker,
+    required this.soundEffectsEnabled,
+    required this.onSoundEffectsChanged,
     this.readOnly = false,
     this.onSignOut,
   });
@@ -44,6 +49,9 @@ class ChildWallScreen extends StatelessWidget {
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
   final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final ValueChanged<PlayBoardSticker> onPlayBoardSticker;
+  final bool soundEffectsEnabled;
+  final ValueChanged<bool> onSoundEffectsChanged;
   final bool readOnly;
   final VoidCallback? onSignOut;
 
@@ -66,16 +74,34 @@ class ChildWallScreen extends StatelessWidget {
                     onEndCall: onEndCall,
                     onPlayAnswer: onPlayAnswer,
                     onPlayBoardStroke: onPlayBoardStroke,
+                    onPlayBoardSticker: onPlayBoardSticker,
                     readOnly: readOnly,
                   )
                 : const _DimWall(),
           ),
-          if (onSignOut != null)
-            Positioned(
-              top: MediaQuery.paddingOf(context).top + 14,
-              right: 18,
-              child: _WallAccountMenu(onSignOut: onSignOut!),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 14,
+            right: 18,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const LanguageMenu(
+                  dark: true,
+                  backgroundColor: Color(0xCC1C2024),
+                ),
+                const SizedBox(width: 8),
+                SoundEffectsToggle(
+                  enabled: soundEffectsEnabled,
+                  onChanged: onSoundEffectsChanged,
+                  dark: true,
+                ),
+                if (onSignOut != null) ...[
+                  const SizedBox(width: 8),
+                  _WallAccountMenu(onSignOut: onSignOut!),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -158,6 +184,7 @@ class _ActiveWall extends StatelessWidget {
     required this.onEndCall,
     required this.onPlayAnswer,
     required this.onPlayBoardStroke,
+    required this.onPlayBoardSticker,
     required this.readOnly,
   });
 
@@ -171,6 +198,7 @@ class _ActiveWall extends StatelessWidget {
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
   final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final ValueChanged<PlayBoardSticker> onPlayBoardSticker;
   final bool readOnly;
 
   @override
@@ -238,6 +266,7 @@ class _ActiveWall extends StatelessWidget {
                 onEndCall: onEndCall,
                 onPlayAnswer: onPlayAnswer,
                 onPlayBoardStroke: onPlayBoardStroke,
+                onPlayBoardSticker: onPlayBoardSticker,
                 readOnly: readOnly,
               ),
             ),
@@ -247,6 +276,7 @@ class _ActiveWall extends StatelessWidget {
                 session: playSession,
                 onAnswer: onPlayAnswer,
                 onBoardStroke: readOnly ? null : onPlayBoardStroke,
+                onBoardSticker: readOnly ? null : onPlayBoardSticker,
                 actorId: currentUserId ?? 'child-wall',
                 interactive: !readOnly,
                 playfulButton: true,
@@ -284,6 +314,7 @@ class _CallingOverlay extends StatelessWidget {
     required this.onEndCall,
     required this.onPlayAnswer,
     required this.onPlayBoardStroke,
+    required this.onPlayBoardSticker,
     required this.readOnly,
   });
 
@@ -296,12 +327,16 @@ class _CallingOverlay extends StatelessWidget {
   final VoidCallback onEndCall;
   final ValueChanged<String> onPlayAnswer;
   final ValueChanged<PlayBoardStroke> onPlayBoardStroke;
+  final ValueChanged<PlayBoardSticker> onPlayBoardSticker;
   final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
     final accent = Color(contact?.accentColorValue ?? 0xFFE85D43);
     final strings = context.t;
+    final contactTitle = contact == null
+        ? strings.familyIsHere
+        : strings.childContactDisplayName(contact!.displayName);
     final role = call.isCallingChildWall
         ? WebRtcPeerRole.callee
         : WebRtcPeerRole.caller;
@@ -322,9 +357,7 @@ class _CallingOverlay extends StatelessWidget {
                           roomId: call.id,
                           sessionId: _sessionIdFor(call),
                           role: role,
-                          title: contact == null
-                              ? strings.familyIsHere
-                              : contact!.displayName,
+                          title: contactTitle,
                           accent: accent,
                           onEndCall: onEndCall,
                         ),
@@ -332,6 +365,7 @@ class _CallingOverlay extends StatelessWidget {
                           session: playSession,
                           onAnswer: onPlayAnswer,
                           onBoardStroke: readOnly ? null : onPlayBoardStroke,
+                          onBoardSticker: readOnly ? null : onPlayBoardSticker,
                           actorId: currentUserId ?? 'child-wall',
                           interactive: !readOnly,
                           overlay: true,
@@ -344,9 +378,7 @@ class _CallingOverlay extends StatelessWidget {
                         roomId: call.id,
                         sessionId: _sessionIdFor(call),
                         role: role,
-                        title: contact == null
-                            ? strings.familyIsHere
-                            : contact!.displayName,
+                        title: contactTitle,
                         accent: accent,
                         onEndCall: onEndCall,
                       ),

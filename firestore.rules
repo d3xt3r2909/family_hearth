@@ -223,14 +223,17 @@ service cloud.firestore {
         'createdAt',
         'updatedAt',
         'boardStrokes',
+        'boardStickers',
         'childResponseKey',
         'childResponseCorrect',
       ];
     }
 
     function validPlayBoard() {
-      return !request.resource.data.keys().hasAny(['boardStrokes']) ||
-        request.resource.data.boardStrokes is list;
+      return (!request.resource.data.keys().hasAny(['boardStrokes']) ||
+          request.resource.data.boardStrokes is list) &&
+        (!request.resource.data.keys().hasAny(['boardStickers']) ||
+          request.resource.data.boardStickers is list);
     }
 
     function validPlayCore(familyId) {
@@ -273,6 +276,7 @@ service cloud.firestore {
         isChildWall(familyId) &&
         request.resource.data.status == 'idle' &&
         request.resource.data.boardStrokes is list &&
+        request.resource.data.boardStickers is list &&
         request.resource.data.createdBy == request.auth.uid;
     }
 
@@ -281,10 +285,12 @@ service cloud.firestore {
         validPlayCore(familyId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'boardStrokes',
+          'boardStickers',
           'createdBy',
           'updatedAt',
         ]) &&
         request.resource.data.boardStrokes is list &&
+        request.resource.data.boardStickers is list &&
         request.resource.data.createdBy == request.auth.uid;
     }
 

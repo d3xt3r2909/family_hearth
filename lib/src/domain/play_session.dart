@@ -66,10 +66,55 @@ class PlayBoardStroke {
   }
 }
 
+class PlayBoardSticker {
+  const PlayBoardSticker({
+    required this.id,
+    required this.actorId,
+    required this.key,
+    required this.x,
+    required this.y,
+    required this.colorValue,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String actorId;
+  final String key;
+  final double x;
+  final double y;
+  final int colorValue;
+  final DateTime createdAt;
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'actorId': actorId,
+    'key': key,
+    'x': x,
+    'y': y,
+    'colorValue': colorValue,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  static PlayBoardSticker fromJson(Map<String, Object?> json) {
+    return PlayBoardSticker(
+      id: json['id'] as String? ?? '',
+      actorId: json['actorId'] as String? ?? '',
+      key: json['key'] as String? ?? 'dog',
+      x: _unitValue(json['x']),
+      y: _unitValue(json['y']),
+      colorValue: _intValue(json['colorValue'], 0xFFE85D43),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
 class PlayActivityCatalog {
   const PlayActivityCatalog._();
 
   static const maxBoardStrokes = 42;
+  static const maxBoardStickers = 32;
   static const beatKeys = ['boom', 'ding', 'whoosh'];
   static const bubbleKeys = ['bubbles'];
   static const clapKeys = ['clap'];
@@ -105,6 +150,7 @@ class PlaySession {
     required this.createdAt,
     required this.updatedAt,
     this.boardStrokes = const [],
+    this.boardStickers = const [],
     this.childResponseKey,
     this.childResponseCorrect,
   });
@@ -121,13 +167,14 @@ class PlaySession {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<PlayBoardStroke> boardStrokes;
+  final List<PlayBoardSticker> boardStickers;
   final String? childResponseKey;
   final bool? childResponseCorrect;
 
   bool get hasPrompt =>
       status != PlaySessionStatus.idle && targetKey.trim().isNotEmpty;
 
-  bool get hasBoard => boardStrokes.isNotEmpty;
+  bool get hasBoard => boardStrokes.isNotEmpty || boardStickers.isNotEmpty;
 
   bool get hasPlaySurface => hasPrompt || hasBoard;
 
@@ -161,6 +208,7 @@ class PlaySession {
     required String targetKey,
     required String createdBy,
     List<PlayBoardStroke> boardStrokes = const [],
+    List<PlayBoardSticker> boardStickers = const [],
   }) {
     final now = DateTime.now();
     return PlaySession(
@@ -174,6 +222,7 @@ class PlaySession {
       createdAt: now,
       updatedAt: now,
       boardStrokes: boardStrokes,
+      boardStickers: boardStickers,
     );
   }
 
@@ -185,6 +234,7 @@ class PlaySession {
     String? createdBy,
     DateTime? updatedAt,
     List<PlayBoardStroke>? boardStrokes,
+    List<PlayBoardSticker>? boardStickers,
     String? childResponseKey,
     bool? childResponseCorrect,
   }) {
@@ -199,6 +249,7 @@ class PlaySession {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       boardStrokes: boardStrokes ?? this.boardStrokes,
+      boardStickers: boardStickers ?? this.boardStickers,
       childResponseKey: childResponseKey ?? this.childResponseKey,
       childResponseCorrect: childResponseCorrect ?? this.childResponseCorrect,
     );
@@ -223,11 +274,35 @@ class PlaySession {
     );
   }
 
+  PlaySession withBoardSticker(
+    PlayBoardSticker sticker, {
+    required String actorId,
+  }) {
+    final nextStickers = [
+      for (final current in boardStickers)
+        if (current.id != sticker.id) current,
+      sticker,
+    ];
+    final trimmedStickers =
+        nextStickers.length > PlayActivityCatalog.maxBoardStickers
+        ? nextStickers.sublist(
+            nextStickers.length - PlayActivityCatalog.maxBoardStickers,
+          )
+        : nextStickers;
+
+    return copyWith(
+      createdBy: actorId,
+      updatedAt: DateTime.now(),
+      boardStickers: trimmedStickers,
+    );
+  }
+
   PlaySession withoutBoard({required String actorId}) {
     return copyWith(
       createdBy: actorId,
       updatedAt: DateTime.now(),
       boardStrokes: const [],
+      boardStickers: const [],
     );
   }
 
@@ -243,6 +318,7 @@ class PlaySession {
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       boardStrokes: boardStrokes,
+      boardStickers: boardStickers,
       childResponseKey: responseKey,
       childResponseCorrect: null,
     );
@@ -258,6 +334,7 @@ class PlaySession {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'boardStrokes': boardStrokes.map((stroke) => stroke.toJson()).toList(),
+    'boardStickers': boardStickers.map((sticker) => sticker.toJson()).toList(),
     'childResponseKey': childResponseKey,
     'childResponseCorrect': childResponseCorrect,
   };
@@ -293,6 +370,16 @@ class PlaySession {
               .map(
                 (stroke) =>
                     PlayBoardStroke.fromJson(Map<String, Object?>.from(stroke)),
+              )
+              .toList(growable: false) ??
+          const [],
+      boardStickers:
+          (json['boardStickers'] as List?)
+              ?.whereType<Map>()
+              .map(
+                (sticker) => PlayBoardSticker.fromJson(
+                  Map<String, Object?>.from(sticker),
+                ),
               )
               .toList(growable: false) ??
           const [],

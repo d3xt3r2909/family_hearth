@@ -13,6 +13,7 @@ class ChildPlaySurface extends StatefulWidget {
     required this.session,
     required this.onAnswer,
     this.onBoardStroke,
+    this.onBoardSticker,
     this.actorId = 'child-wall',
     this.interactive = true,
     this.overlay = false,
@@ -22,6 +23,7 @@ class ChildPlaySurface extends StatefulWidget {
   final PlaySession session;
   final ValueChanged<String> onAnswer;
   final ValueChanged<PlayBoardStroke>? onBoardStroke;
+  final ValueChanged<PlayBoardSticker>? onBoardSticker;
   final String actorId;
   final bool interactive;
   final bool overlay;
@@ -62,8 +64,16 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
     if (!widget.interactive) {
       return;
     }
-    _handleSurfaceTap();
     widget.onBoardStroke?.call(stroke);
+    _answerPromptFromBoard();
+  }
+
+  void _handleBoardSticker(PlayBoardSticker sticker) {
+    if (!widget.interactive) {
+      return;
+    }
+    widget.onBoardSticker?.call(sticker);
+    _answerPromptFromBoard();
   }
 
   void _playPromptSound() {
@@ -98,6 +108,13 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
     if (session.isPrompting) {
       widget.onAnswer(PlaySession.childTouchKey);
     }
+  }
+
+  void _answerPromptFromBoard() {
+    if (!widget.interactive || !widget.session.isPrompting) {
+      return;
+    }
+    widget.onAnswer(PlaySession.childTouchKey);
   }
 
   @override
@@ -146,10 +163,16 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
                 Positioned.fill(
                   child: _PlayBoardSurface(
                     strokes: session.boardStrokes,
+                    stickers: session.boardStickers,
                     actorId: widget.actorId,
-                    enabled: widget.interactive && widget.onBoardStroke != null,
+                    enabled:
+                        widget.interactive &&
+                        (widget.onBoardStroke != null ||
+                            widget.onBoardSticker != null),
                     onStrokeAdded: _handleBoardStroke,
+                    onStickerChanged: _handleBoardSticker,
                     colorValue: 0xFF197A6E,
+                    showStickerTray: widget.interactive,
                     fullBleed: true,
                   ),
                 )
@@ -169,10 +192,37 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
                         return const SizedBox.shrink();
                       }
 
+                      if (session.hasBoard) {
+                        if (session.isPrompting) {
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: _BoardPromptCallout(
+                              session: session,
+                              label: targetLabel,
+                              accent: accent,
+                              compact: compact,
+                              animation: _buttonMotion,
+                              burstIndex: _tapBurst,
+                              onTap: _handleSurfaceTap,
+                            ),
+                          );
+                        }
+
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: IgnorePointer(
+                            child: _BoardPromptBadge(
+                              session: session,
+                              label: targetLabel,
+                              accent: accent,
+                              answered: answered,
+                            ),
+                          ),
+                        );
+                      }
+
                       return Align(
-                        alignment: session.hasBoard
-                            ? Alignment.topCenter
-                            : Alignment.center,
+                        alignment: Alignment.center,
                         child: SingleChildScrollView(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -250,6 +300,141 @@ class _ChildPlaySurfaceState extends State<ChildPlaySurface>
   }
 }
 
+class _BoardPromptCallout extends StatelessWidget {
+  const _BoardPromptCallout({
+    required this.session,
+    required this.label,
+    required this.accent,
+    required this.compact,
+    required this.animation,
+    required this.burstIndex,
+    required this.onTap,
+  });
+
+  final PlaySession session;
+  final String label;
+  final Color accent;
+  final bool compact;
+  final Animation<double> animation;
+  final int burstIndex;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+    final visualSize = compact ? 118.0 : 148.0;
+
+    return Material(
+      color: const Color(0xF7FFFFFF),
+      elevation: 18,
+      shadowColor: Colors.black.withValues(alpha: 0.2),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: accent, width: 3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: compact ? 270 : 330),
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 12 : 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _PlayfulBabyButtonMotion(
+                  enabled: true,
+                  animation: animation,
+                  accent: accent,
+                  child: _BabyMomentVisual(
+                    session: session,
+                    label: label,
+                    accent: accent,
+                    size: visualSize,
+                    answered: false,
+                    burstIndex: burstIndex,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  strings.playWallMoment(session.activity, label),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: const Color(0xFF221B16),
+                    fontSize: compact ? 24 : 30,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  strings.playWallTapHint,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: const Color(0xFF221B16).withValues(alpha: 0.58),
+                    fontSize: compact ? 15 : 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardPromptBadge extends StatelessWidget {
+  const _BoardPromptBadge({
+    required this.session,
+    required this.label,
+    required this.accent,
+    required this.answered,
+  });
+
+  final PlaySession session;
+  final String label;
+  final Color accent;
+  final bool answered;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+
+    return Material(
+      color: const Color(0xEFFFFFFF),
+      elevation: 10,
+      shadowColor: Colors.black.withValues(alpha: 0.18),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: accent, width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_iconFor(session.activity, session.targetKey), color: accent),
+            const SizedBox(width: 8),
+            Text(
+              answered
+                  ? strings.playWallBabyJoined
+                  : strings.playWallMoment(session.activity, label),
+              style: const TextStyle(
+                color: Color(0xFF221B16),
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class RelativePlayroomPanel extends StatelessWidget {
   const RelativePlayroomPanel({
     super.key,
@@ -258,8 +443,10 @@ class RelativePlayroomPanel extends StatelessWidget {
     required this.actorId,
     required this.onSendPrompt,
     required this.onBoardStroke,
+    required this.onBoardSticker,
     required this.onClearBoard,
     required this.onClear,
+    this.boardHeight,
   });
 
   final bool enabled;
@@ -267,8 +454,10 @@ class RelativePlayroomPanel extends StatelessWidget {
   final String actorId;
   final void Function(PlayActivity activity, String targetKey) onSendPrompt;
   final ValueChanged<PlayBoardStroke> onBoardStroke;
+  final ValueChanged<PlayBoardSticker> onBoardSticker;
   final VoidCallback onClearBoard;
   final VoidCallback onClear;
+  final double? boardHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -307,27 +496,99 @@ class RelativePlayroomPanel extends StatelessWidget {
           enabled: enabled,
           actorId: actorId,
           strokes: session.boardStrokes,
+          stickers: session.boardStickers,
+          height: boardHeight,
           onStrokeAdded: onBoardStroke,
+          onStickerChanged: onBoardSticker,
           onClear: onClearBoard,
         ),
         const SizedBox(height: 14),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final option in promptOptions)
-              _RelativeMomentButton(
-                keyValue: option.key,
-                label: strings.playTargetLabel(option.key),
-                activity: option.activity,
-                enabled: enabled,
-                onPressed: () => onSendPrompt(option.activity, option.key),
-              ),
-          ],
-        ),
-        const SizedBox(height: 14),
+        if (session.hasBoard) ...[
+          _CompactMomentStrip(
+            enabled: enabled,
+            options: promptOptions,
+            onSelected: onSendPrompt,
+          ),
+          const SizedBox(height: 14),
+        ] else ...[
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final option in promptOptions)
+                _RelativeMomentButton(
+                  keyValue: option.key,
+                  label: strings.playTargetLabel(option.key),
+                  activity: option.activity,
+                  enabled: enabled,
+                  onPressed: () => onSendPrompt(option.activity, option.key),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
         _PlayroomStatus(session: session),
       ],
+    );
+  }
+}
+
+class _CompactMomentStrip extends StatelessWidget {
+  const _CompactMomentStrip({
+    required this.enabled,
+    required this.options,
+    required this.onSelected,
+  });
+
+  final bool enabled;
+  final List<PlayPromptOption> options;
+  final void Function(PlayActivity activity, String key) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.t;
+
+    return SizedBox(
+      height: 46,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          final color = _colorForKey(option.key);
+
+          return Tooltip(
+            message: strings.playTargetLabel(option.key),
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: color.withValues(alpha: 0.14),
+                foregroundColor: color,
+                disabledBackgroundColor: const Color(0xFFE8DED5),
+                disabledForegroundColor: const Color(0xFF8A7C71),
+                minimumSize: const Size(48, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: color.withValues(alpha: 0.32)),
+                ),
+              ),
+              onPressed: enabled
+                  ? () {
+                      unawaited(
+                        PlaySoundEffects.playMoment(
+                          option.activity,
+                          option.key,
+                        ),
+                      );
+                      onSelected(option.activity, option.key);
+                    }
+                  : null,
+              child: Icon(_iconFor(option.activity, option.key), size: 22),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -374,14 +635,20 @@ class _RelativeBoardPanel extends StatelessWidget {
     required this.enabled,
     required this.actorId,
     required this.strokes,
+    required this.stickers,
+    required this.height,
     required this.onStrokeAdded,
+    required this.onStickerChanged,
     required this.onClear,
   });
 
   final bool enabled;
   final String actorId;
   final List<PlayBoardStroke> strokes;
+  final List<PlayBoardSticker> stickers;
+  final double? height;
   final ValueChanged<PlayBoardStroke> onStrokeAdded;
+  final ValueChanged<PlayBoardSticker> onStickerChanged;
   final VoidCallback onClear;
 
   @override
@@ -406,7 +673,7 @@ class _RelativeBoardPanel extends StatelessWidget {
                 ),
               ),
             ),
-            if (strokes.isNotEmpty)
+            if (strokes.isNotEmpty || stickers.isNotEmpty)
               IconButton(
                 tooltip: strings.clearBoard,
                 onPressed: enabled ? onClear : null,
@@ -416,13 +683,16 @@ class _RelativeBoardPanel extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 260,
+          height: height ?? 260,
           child: _PlayBoardSurface(
             strokes: strokes,
+            stickers: stickers,
             actorId: actorId,
             enabled: enabled,
             onStrokeAdded: onStrokeAdded,
+            onStickerChanged: onStickerChanged,
             colorValue: 0xFFE85D43,
+            showStickerTray: true,
           ),
         ),
       ],
@@ -433,18 +703,24 @@ class _RelativeBoardPanel extends StatelessWidget {
 class _PlayBoardSurface extends StatefulWidget {
   const _PlayBoardSurface({
     required this.strokes,
+    required this.stickers,
     required this.actorId,
     required this.enabled,
     required this.onStrokeAdded,
+    required this.onStickerChanged,
     required this.colorValue,
+    this.showStickerTray = false,
     this.fullBleed = false,
   });
 
   final List<PlayBoardStroke> strokes;
+  final List<PlayBoardSticker> stickers;
   final String actorId;
   final bool enabled;
   final ValueChanged<PlayBoardStroke> onStrokeAdded;
+  final ValueChanged<PlayBoardSticker> onStickerChanged;
   final int colorValue;
+  final bool showStickerTray;
   final bool fullBleed;
 
   @override
@@ -453,7 +729,11 @@ class _PlayBoardSurface extends StatefulWidget {
 
 class _PlayBoardSurfaceState extends State<_PlayBoardSurface> {
   static const _minimumPointDistance = 0.009;
+  static const _stickerKeys = ['dog', 'cat', 'cow'];
+  static const _stickerSize = 74.0;
 
+  final _boardKey = GlobalKey();
+  final _latestStickerDragPositions = <_StickerDragPayload, Offset>{};
   List<PlayBoardPoint> _draftPoints = const [];
 
   void _beginStroke(Offset localPosition, Size size) {
@@ -500,6 +780,87 @@ class _PlayBoardSurfaceState extends State<_PlayBoardSurface> {
     widget.onStrokeAdded(stroke);
   }
 
+  void _commitStickerDragEnd(
+    _StickerDragPayload payload,
+    DraggableDetails details,
+    double feedbackSize,
+  ) {
+    if (!widget.enabled) {
+      return;
+    }
+
+    final dropCenter =
+        _latestStickerDragPositions.remove(payload) ??
+        details.offset + Offset(feedbackSize / 2, feedbackSize / 2);
+    _commitStickerAtGlobal(payload, dropCenter);
+  }
+
+  void _trackStickerDrag(
+    _StickerDragPayload payload,
+    DragUpdateDetails details,
+  ) {
+    if (!widget.enabled) {
+      return;
+    }
+    _latestStickerDragPositions[payload] = details.globalPosition;
+  }
+
+  void _commitStickerAtGlobal(
+    _StickerDragPayload payload,
+    Offset globalPosition,
+  ) {
+    final context = _boardKey.currentContext;
+    if (context == null) {
+      return;
+    }
+
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) {
+      return;
+    }
+
+    final local = box.globalToLocal(globalPosition);
+    if (local.dx < 0 ||
+        local.dy < 0 ||
+        local.dx > box.size.width ||
+        local.dy > box.size.height) {
+      return;
+    }
+
+    _commitStickerAt(payload, local, box.size);
+  }
+
+  void _commitStickerAt(_StickerDragPayload payload, Offset local, Size size) {
+    final point = _pointFor(local, size);
+    final now = DateTime.now();
+    widget.onStickerChanged(
+      PlayBoardSticker(
+        id: payload.id ?? 'sticker-${now.microsecondsSinceEpoch}',
+        actorId: widget.actorId,
+        key: payload.key,
+        x: point.x,
+        y: point.y,
+        colorValue: _stickerColorFor(payload.key).toARGB32(),
+        createdAt: payload.createdAt ?? now,
+      ),
+    );
+  }
+
+  void _addStickerFromTap(String key, Size size) {
+    if (!widget.enabled) {
+      return;
+    }
+
+    final count = widget.stickers.length;
+    final x = 0.32 + (count % 3) * 0.18;
+    final y = 0.34 + ((count ~/ 3) % 3) * 0.18;
+    _commitStickerAt(
+      _StickerDragPayload(key: key),
+      Offset(x * size.width, y * size.height),
+      size,
+    );
+  }
+
   void _commitTap(Offset localPosition, Size size) {
     if (!widget.enabled) {
       return;
@@ -536,38 +897,69 @@ class _PlayBoardSurfaceState extends State<_PlayBoardSurface> {
           cursor: widget.enabled
               ? SystemMouseCursors.precise
               : SystemMouseCursors.basic,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: widget.enabled
-                ? (details) => _commitTap(details.localPosition, size)
-                : null,
-            onPanStart: widget.enabled
-                ? (details) => _beginStroke(details.localPosition, size)
-                : null,
-            onPanUpdate: widget.enabled
-                ? (details) => _appendStrokePoint(details.localPosition, size)
-                : null,
-            onPanEnd: widget.enabled ? (_) => _commitDraft() : null,
-            onPanCancel: widget.enabled ? _commitDraft : null,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(widget.fullBleed ? 0 : 8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBF2),
-                  borderRadius: BorderRadius.circular(widget.fullBleed ? 0 : 8),
-                  border: widget.fullBleed
-                      ? null
-                      : Border.all(color: const Color(0xFFE3D8CD)),
-                ),
-                child: CustomPaint(
-                  painter: _PlayBoardPainter(
-                    strokes: widget.strokes,
-                    draftPoints: _draftPoints,
-                    draftColorValue: widget.colorValue,
-                    fullBleed: widget.fullBleed,
+          child: ClipRRect(
+            key: _boardKey,
+            borderRadius: BorderRadius.circular(widget.fullBleed ? 0 : 8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF2),
+                borderRadius: BorderRadius.circular(widget.fullBleed ? 0 : 8),
+                border: widget.fullBleed
+                    ? null
+                    : Border.all(color: const Color(0xFFE3D8CD)),
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: widget.enabled
+                          ? (details) => _commitTap(details.localPosition, size)
+                          : null,
+                      onPanStart: widget.enabled
+                          ? (details) =>
+                                _beginStroke(details.localPosition, size)
+                          : null,
+                      onPanUpdate: widget.enabled
+                          ? (details) =>
+                                _appendStrokePoint(details.localPosition, size)
+                          : null,
+                      onPanEnd: widget.enabled ? (_) => _commitDraft() : null,
+                      onPanCancel: widget.enabled ? _commitDraft : null,
+                      child: CustomPaint(
+                        painter: _PlayBoardPainter(
+                          strokes: widget.strokes,
+                          stickers: widget.stickers,
+                          draftPoints: _draftPoints,
+                          draftColorValue: widget.colorValue,
+                          fullBleed: widget.fullBleed,
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
                   ),
-                  child: const SizedBox.expand(),
-                ),
+                  for (final sticker in widget.stickers)
+                    _PositionedBoardSticker(
+                      sticker: sticker,
+                      boardSize: size,
+                      enabled: widget.enabled,
+                      onDragUpdate: _trackStickerDrag,
+                      onDragEnd: _commitStickerDragEnd,
+                    ),
+                  if (widget.showStickerTray)
+                    Positioned(
+                      left: widget.fullBleed ? 22 : 12,
+                      right: widget.fullBleed ? 22 : 12,
+                      bottom: widget.fullBleed ? 22 : 12,
+                      child: _StickerTray(
+                        enabled: widget.enabled,
+                        keys: _stickerKeys,
+                        onStickerTap: (key) => _addStickerFromTap(key, size),
+                        onStickerDragUpdate: _trackStickerDrag,
+                        onStickerDragEnd: _commitStickerDragEnd,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -577,15 +969,545 @@ class _PlayBoardSurfaceState extends State<_PlayBoardSurface> {
   }
 }
 
+class _StickerDragPayload {
+  const _StickerDragPayload({required this.key, this.id, this.createdAt});
+
+  final String key;
+  final String? id;
+  final DateTime? createdAt;
+}
+
+typedef _StickerDragEndCallback =
+    void Function(
+      _StickerDragPayload payload,
+      DraggableDetails details,
+      double feedbackSize,
+    );
+typedef _StickerDragUpdateCallback =
+    void Function(_StickerDragPayload payload, DragUpdateDetails details);
+
+class _StickerTray extends StatelessWidget {
+  const _StickerTray({
+    required this.enabled,
+    required this.keys,
+    required this.onStickerTap,
+    required this.onStickerDragUpdate,
+    required this.onStickerDragEnd,
+  });
+
+  final bool enabled;
+  final List<String> keys;
+  final ValueChanged<String> onStickerTap;
+  final _StickerDragUpdateCallback onStickerDragUpdate;
+  final _StickerDragEndCallback onStickerDragEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    const childSize = 58.0;
+    const feedbackSize = 78.0;
+
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.56,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            for (final key in keys)
+              _StickerTrayItem(
+                keyValue: key,
+                childSize: childSize,
+                feedbackSize: feedbackSize,
+                onTap: () => onStickerTap(key),
+                onDragUpdate: onStickerDragUpdate,
+                onDragEnd: onStickerDragEnd,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StickerTrayItem extends StatelessWidget {
+  const _StickerTrayItem({
+    required this.keyValue,
+    required this.childSize,
+    required this.feedbackSize,
+    required this.onTap,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
+
+  final String keyValue;
+  final double childSize;
+  final double feedbackSize;
+  final VoidCallback onTap;
+  final _StickerDragUpdateCallback onDragUpdate;
+  final _StickerDragEndCallback onDragEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final payload = _StickerDragPayload(key: keyValue);
+
+    return Draggable<_StickerDragPayload>(
+      data: payload,
+      onDragUpdate: (details) => onDragUpdate(payload, details),
+      onDragEnd: (details) => onDragEnd(payload, details, feedbackSize),
+      feedback: Material(
+        color: Colors.transparent,
+        child: _AnimalSticker(keyValue: keyValue, size: feedbackSize),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.35,
+        child: _AnimalSticker(keyValue: keyValue, size: childSize),
+      ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: _AnimalSticker(keyValue: keyValue, size: childSize),
+      ),
+    );
+  }
+}
+
+class _PositionedBoardSticker extends StatelessWidget {
+  const _PositionedBoardSticker({
+    required this.sticker,
+    required this.boardSize,
+    required this.enabled,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
+
+  final PlayBoardSticker sticker;
+  final Size boardSize;
+  final bool enabled;
+  final _StickerDragUpdateCallback onDragUpdate;
+  final _StickerDragEndCallback onDragEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _PlayBoardSurfaceState._stickerSize;
+    final feedbackSize = size + 8;
+    final left = (sticker.x * boardSize.width - size / 2).clamp(
+      0.0,
+      math.max(0, boardSize.width - size),
+    );
+    final top = (sticker.y * boardSize.height - size / 2).clamp(
+      0.0,
+      math.max(0, boardSize.height - size),
+    );
+    final child = _AnimalSticker(keyValue: sticker.key, size: size);
+    final payload = _StickerDragPayload(
+      id: sticker.id,
+      key: sticker.key,
+      createdAt: sticker.createdAt,
+    );
+
+    return Positioned(
+      left: left.toDouble(),
+      top: top.toDouble(),
+      child: enabled
+          ? Draggable<_StickerDragPayload>(
+              data: payload,
+              onDragUpdate: (details) => onDragUpdate(payload, details),
+              onDragEnd: (details) => onDragEnd(payload, details, feedbackSize),
+              feedback: Material(
+                color: Colors.transparent,
+                child: _AnimalSticker(
+                  keyValue: sticker.key,
+                  size: feedbackSize,
+                ),
+              ),
+              childWhenDragging: Opacity(opacity: 0.24, child: child),
+              child: child,
+            )
+          : child,
+    );
+  }
+}
+
+class _AnimalSticker extends StatelessWidget {
+  const _AnimalSticker({required this.keyValue, required this.size});
+
+  final String keyValue;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _stickerColorFor(keyValue);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.24),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(size * 0.09),
+        child: CustomPaint(
+          painter: _AnimalStickerPainter(keyValue: keyValue, accent: color),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimalStickerPainter extends CustomPainter {
+  const _AnimalStickerPainter({required this.keyValue, required this.accent});
+
+  final String keyValue;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    switch (keyValue) {
+      case 'cat':
+        _drawCat(canvas, size);
+      case 'cow':
+        _drawCow(canvas, size);
+      case 'dog':
+      default:
+        _drawDog(canvas, size);
+    }
+  }
+
+  void _drawDog(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * 0.36;
+    final earPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF73533E);
+    final facePaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFC96F);
+    final muzzlePaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFE4B3);
+    final detailPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF332822);
+    final linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.shortestSide * 0.045
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF332822);
+
+    _drawTiltedOval(
+      canvas,
+      Offset(size.width * 0.25, size.height * 0.42),
+      Size(size.width * 0.24, size.height * 0.38),
+      -0.42,
+      earPaint,
+    );
+    _drawTiltedOval(
+      canvas,
+      Offset(size.width * 0.75, size.height * 0.42),
+      Size(size.width * 0.24, size.height * 0.38),
+      0.42,
+      earPaint,
+    );
+    canvas.drawCircle(center, radius, facePaint);
+    canvas.drawCircle(
+      Offset(size.width * 0.38, size.height * 0.43),
+      radius * 0.12,
+      detailPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.62, size.height * 0.43),
+      radius * 0.12,
+      detailPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.62),
+        width: size.width * 0.34,
+        height: size.height * 0.24,
+      ),
+      muzzlePaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.56),
+        width: size.width * 0.13,
+        height: size.height * 0.1,
+      ),
+      detailPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.5, size.height * 0.61),
+      Offset(size.width * 0.5, size.height * 0.68),
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.43, size.height * 0.67),
+        width: size.width * 0.18,
+        height: size.height * 0.13,
+      ),
+      0.05,
+      math.pi * 0.72,
+      false,
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.57, size.height * 0.67),
+        width: size.width * 0.18,
+        height: size.height * 0.13,
+      ),
+      math.pi * 0.22,
+      math.pi * 0.72,
+      false,
+      linePaint,
+    );
+  }
+
+  void _drawCat(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * 0.36;
+    final facePaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFA05E);
+    final earPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFE85D43);
+    final innerEarPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFD0C0);
+    final detailPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF332822);
+    final linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.shortestSide * 0.035
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF332822);
+
+    _drawTriangle(canvas, [
+      Offset(size.width * 0.23, size.height * 0.33),
+      Offset(size.width * 0.38, size.height * 0.08),
+      Offset(size.width * 0.49, size.height * 0.36),
+    ], earPaint);
+    _drawTriangle(canvas, [
+      Offset(size.width * 0.51, size.height * 0.36),
+      Offset(size.width * 0.62, size.height * 0.08),
+      Offset(size.width * 0.77, size.height * 0.33),
+    ], earPaint);
+    _drawTriangle(canvas, [
+      Offset(size.width * 0.33, size.height * 0.28),
+      Offset(size.width * 0.38, size.height * 0.17),
+      Offset(size.width * 0.44, size.height * 0.3),
+    ], innerEarPaint);
+    _drawTriangle(canvas, [
+      Offset(size.width * 0.56, size.height * 0.3),
+      Offset(size.width * 0.62, size.height * 0.17),
+      Offset(size.width * 0.67, size.height * 0.28),
+    ], innerEarPaint);
+    canvas.drawCircle(center, radius, facePaint);
+    canvas.drawCircle(
+      Offset(size.width * 0.38, size.height * 0.45),
+      radius * 0.1,
+      detailPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.62, size.height * 0.45),
+      radius * 0.1,
+      detailPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.58),
+        width: size.width * 0.11,
+        height: size.height * 0.08,
+      ),
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = const Color(0xFFFFE1D7),
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.35, size.height * 0.59),
+      Offset(size.width * 0.14, size.height * 0.53),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.35, size.height * 0.65),
+      Offset(size.width * 0.14, size.height * 0.68),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.65, size.height * 0.59),
+      Offset(size.width * 0.86, size.height * 0.53),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.65, size.height * 0.65),
+      Offset(size.width * 0.86, size.height * 0.68),
+      linePaint,
+    );
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.63),
+        width: size.width * 0.24,
+        height: size.height * 0.16,
+      ),
+      0.08,
+      math.pi - 0.16,
+      false,
+      linePaint,
+    );
+  }
+
+  void _drawCow(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * 0.35;
+    final hornPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFDFA4);
+    final earPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF4967B1);
+    final facePaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFF8EB);
+    final spotPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF332822);
+    final muzzlePaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFFC6C6);
+    final detailPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF332822);
+
+    _drawTriangle(canvas, [
+      Offset(size.width * 0.36, size.height * 0.2),
+      Offset(size.width * 0.31, size.height * 0.03),
+      Offset(size.width * 0.46, size.height * 0.16),
+    ], hornPaint);
+    _drawTriangle(canvas, [
+      Offset(size.width * 0.54, size.height * 0.16),
+      Offset(size.width * 0.69, size.height * 0.03),
+      Offset(size.width * 0.64, size.height * 0.2),
+    ], hornPaint);
+    _drawTiltedOval(
+      canvas,
+      Offset(size.width * 0.24, size.height * 0.4),
+      Size(size.width * 0.22, size.height * 0.25),
+      -0.34,
+      earPaint,
+    );
+    _drawTiltedOval(
+      canvas,
+      Offset(size.width * 0.76, size.height * 0.4),
+      Size(size.width * 0.22, size.height * 0.25),
+      0.34,
+      earPaint,
+    );
+    canvas.drawCircle(center, radius, facePaint);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.4, size.height * 0.34),
+        width: size.width * 0.25,
+        height: size.height * 0.2,
+      ),
+      spotPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.66, size.height * 0.47),
+        width: size.width * 0.2,
+        height: size.height * 0.16,
+      ),
+      spotPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.4, size.height * 0.47),
+      radius * 0.1,
+      detailPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.61, size.height * 0.47),
+      radius * 0.1,
+      detailPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.66),
+        width: size.width * 0.4,
+        height: size.height * 0.22,
+      ),
+      muzzlePaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.43, size.height * 0.65),
+      radius * 0.07,
+      detailPaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.57, size.height * 0.65),
+      radius * 0.07,
+      detailPaint,
+    );
+  }
+
+  void _drawTiltedOval(
+    Canvas canvas,
+    Offset center,
+    Size size,
+    double rotation,
+    Paint paint,
+  ) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: size.width,
+        height: size.height,
+      ),
+      paint,
+    );
+    canvas.restore();
+  }
+
+  void _drawTriangle(Canvas canvas, List<Offset> points, Paint paint) {
+    final path = Path()
+      ..moveTo(points[0].dx, points[0].dy)
+      ..lineTo(points[1].dx, points[1].dy)
+      ..lineTo(points[2].dx, points[2].dy)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnimalStickerPainter oldDelegate) {
+    return oldDelegate.keyValue != keyValue || oldDelegate.accent != accent;
+  }
+}
+
 class _PlayBoardPainter extends CustomPainter {
   const _PlayBoardPainter({
     required this.strokes,
+    required this.stickers,
     required this.draftPoints,
     required this.draftColorValue,
     required this.fullBleed,
   });
 
   final List<PlayBoardStroke> strokes;
+  final List<PlayBoardSticker> stickers;
   final List<PlayBoardPoint> draftPoints;
   final int draftColorValue;
   final bool fullBleed;
@@ -594,7 +1516,7 @@ class _PlayBoardPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     _drawBoardTexture(canvas, size);
 
-    if (strokes.isEmpty && draftPoints.isEmpty) {
+    if (strokes.isEmpty && stickers.isEmpty && draftPoints.isEmpty) {
       final paint = Paint()
         ..style = PaintingStyle.fill
         ..color = const Color(0xFFFFB545).withValues(alpha: 0.14);
@@ -714,6 +1636,7 @@ class _PlayBoardPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PlayBoardPainter oldDelegate) {
     return oldDelegate.strokes != strokes ||
+        oldDelegate.stickers != stickers ||
         oldDelegate.draftPoints != draftPoints ||
         oldDelegate.draftColorValue != draftColorValue ||
         oldDelegate.fullBleed != fullBleed;
@@ -1298,6 +2221,13 @@ Color _colorForKey(String key) => switch (key) {
   'smile' => const Color(0xFFFFB545),
   'bubbles' => const Color(0xFF4967B1),
   'clap' => const Color(0xFFE85D43),
+  'dog' => const Color(0xFF197A6E),
+  'cat' => const Color(0xFFE85D43),
+  'cow' => const Color(0xFF4967B1),
+  _ => const Color(0xFFE85D43),
+};
+
+Color _stickerColorFor(String key) => switch (key) {
   'dog' => const Color(0xFF197A6E),
   'cat' => const Color(0xFFE85D43),
   'cow' => const Color(0xFF4967B1),

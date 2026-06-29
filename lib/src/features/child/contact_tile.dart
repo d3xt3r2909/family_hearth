@@ -40,6 +40,13 @@ class _ContactTileState extends State<ContactTile>
   Widget build(BuildContext context) {
     final accent = Color(widget.contact.accentColorValue);
     final phase = _phaseFor(widget.contact);
+    final strings = context.t;
+    final displayName = strings.childContactDisplayName(
+      widget.contact.displayName,
+    );
+    final relationship = strings.childRelationshipLabel(
+      widget.contact.relationship,
+    );
 
     return AnimatedBuilder(
       animation: _controller,
@@ -63,7 +70,7 @@ class _ContactTileState extends State<ContactTile>
       },
       child: Semantics(
         button: true,
-        label: context.t.callPerson(widget.contact.displayName),
+        label: strings.callPerson(displayName),
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -135,8 +142,8 @@ class _ContactTileState extends State<ContactTile>
                               ),
                               _NameBubble(
                                 accent: accent,
-                                name: widget.contact.displayName,
-                                relationship: widget.contact.relationship,
+                                name: displayName,
+                                relationship: relationship,
                               ),
                             ],
                           ),

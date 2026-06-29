@@ -103,6 +103,10 @@ class AppStrings {
     'Vorschaumenü öffnen',
   );
   String get signOut => _pick('Sign out', 'Odjava', 'Abmelden');
+  String get soundEffectsOn =>
+      _pick('Sound effects on', 'Zvukovi uključeni', 'Soundeffekte an');
+  String get soundEffectsOff =>
+      _pick('Sound effects off', 'Zvukovi isključeni', 'Soundeffekte aus');
   String get cancel => _pick('Cancel', 'Odustani', 'Abbrechen');
   String get close => _pick('Close', 'Zatvori', 'Schließen');
   String get parent => _pick('Parent', 'Roditelj', 'Elternteil');
@@ -435,6 +439,55 @@ class AppStrings {
   String get startCall => _pick('Start call', 'Pokreni poziv', 'Anruf starten');
   String callPerson(String name) =>
       _pick('Call $name', 'Pozovi $name', '$name anrufen');
+  String childContactDisplayName(String name) {
+    final value = name.trim();
+    if (value.isEmpty) {
+      return family;
+    }
+
+    for (final replacement in _childRelationshipReplacements) {
+      final prefix = '${replacement.english} ';
+      if (value.toLowerCase().startsWith(prefix.toLowerCase())) {
+        final suffix = value.substring(prefix.length).trimLeft();
+        final translatedPrefix = _pick(
+          replacement.english,
+          replacement.bosnian,
+          replacement.german,
+        );
+        return suffix.isEmpty ? translatedPrefix : '$translatedPrefix $suffix';
+      }
+    }
+
+    return childRelationshipLabel(value, fallbackToOriginal: true);
+  }
+
+  String childRelationshipLabel(
+    String relationship, {
+    bool fallbackToOriginal = true,
+  }) {
+    final value = relationship.trim();
+    if (value.isEmpty) {
+      return family;
+    }
+    final normalized = value.toLowerCase();
+
+    for (final replacement in _childRelationshipReplacements) {
+      if (replacement.matches(normalized)) {
+        return _pick(
+          replacement.english,
+          replacement.bosnian,
+          replacement.german,
+        );
+      }
+    }
+
+    return switch (normalized) {
+      'family' => family,
+      'loved one' => _pick('Loved one', 'Voljena osoba', 'Lieblingsmensch'),
+      _ => fallbackToOriginal ? value : family,
+    };
+  }
+
   String get liveCall => _pick('Live call', 'Poziv uživo', 'Live-Anruf');
   String get privacyReady =>
       _pick('Privacy ready', 'Privatnost spremna', 'Privatsphäre bereit');
@@ -658,4 +711,50 @@ class AppStrings {
     'Dodaj Firebase konfiguraciju i autentifikaciju, zatim će ovaj ekran razmjenjivati WebRTC offer, answer i ICE kandidate kroz Firestore.',
     'Füge Firebase-Konfiguration und Authentifizierung hinzu; danach tauscht dieser Bildschirm WebRTC Offer, Answer und ICE-Kandidaten über Firestore aus.',
   );
+}
+
+const _childRelationshipReplacements = [
+  _ChildRelationshipReplacement(
+    english: 'Grandma',
+    bosnian: 'Nana',
+    german: 'Oma',
+    aliases: ['grandmother', 'granny', 'nana', 'baka', 'oma'],
+  ),
+  _ChildRelationshipReplacement(
+    english: 'Grandpa',
+    bosnian: 'Dedo',
+    german: 'Opa',
+    aliases: ['grandfather', 'granddad', 'dedo', 'opa'],
+  ),
+  _ChildRelationshipReplacement(
+    english: 'Aunt',
+    bosnian: 'Tetka',
+    german: 'Tante',
+    aliases: ['auntie', 'tetka', 'tante'],
+  ),
+  _ChildRelationshipReplacement(
+    english: 'Uncle',
+    bosnian: 'Ujak',
+    german: 'Onkel',
+    aliases: ['uncle', 'ujak', 'amidža', 'amidza', 'onkel'],
+  ),
+];
+
+class _ChildRelationshipReplacement {
+  const _ChildRelationshipReplacement({
+    required this.english,
+    required this.bosnian,
+    required this.german,
+    this.aliases = const [],
+  });
+
+  final String english;
+  final String bosnian;
+  final String german;
+  final List<String> aliases;
+
+  bool matches(String normalizedValue) {
+    return normalizedValue == english.toLowerCase() ||
+        aliases.contains(normalizedValue);
+  }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/demo_family_data.dart';
 import '../data/family_repository.dart';
@@ -15,7 +16,9 @@ import '../domain/play_session.dart';
 import '../domain/schedule_window.dart';
 import '../features/child/child_wall_screen.dart';
 import '../features/parent/parent_control_screen.dart';
+import '../features/play/play_sound_effects.dart';
 import '../features/relative/relative_screen.dart';
+import '../features/shared/sound_effects_toggle.dart';
 import '../firebase/firebase_bootstrap.dart';
 import '../i18n/app_localizations.dart';
 
@@ -36,6 +39,8 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  static const _soundEffectsStorageKey = 'family_hearth_sound_effects_enabled';
+
   late final String _familyId =
       Uri.base.queryParameters['family'] ??
       widget.session?.familyId ??
@@ -56,6 +61,7 @@ class _HomeShellState extends State<HomeShell> {
   StreamSubscription<PlaySession?>? _playSubscription;
   bool _childWallActive = true;
   bool _cameraOn = false;
+  bool _soundEffectsEnabled = PlaySoundEffects.enabled;
   CallSession _call = DemoFamilyData.initialCall;
   late PlaySession _playSession;
   late List<FamilyMember> _members;
@@ -85,6 +91,8 @@ class _HomeShellState extends State<HomeShell> {
     _statsEvents = usePreviewData ? DemoFamilyData.statsEvents : const [];
     _playSession = PlaySession.idle(id: _playRoomId, familyId: _familyId);
     _childWallActive = widget.session?.profile.childWallActive ?? true;
+    PlaySoundEffects.setEnabled(_soundEffectsEnabled);
+    unawaited(_loadSoundEffectsPreference());
     _repository = widget.firebaseStatus.isReady && widget.session != null
         ? FirestoreFamilyRepository()
         : null;
@@ -125,6 +133,26 @@ class _HomeShellState extends State<HomeShell> {
 
   void _setRole(AppRole role) {
     setState(() => _role = role);
+  }
+
+  Future<void> _loadSoundEffectsPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool(_soundEffectsStorageKey) ?? true;
+    PlaySoundEffects.setEnabled(enabled);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _soundEffectsEnabled = enabled);
+  }
+
+  void _setSoundEffectsEnabled(bool enabled) {
+    setState(() => _soundEffectsEnabled = enabled);
+    PlaySoundEffects.setEnabled(enabled);
+    unawaited(
+      SharedPreferences.getInstance().then(
+        (prefs) => prefs.setBool(_soundEffectsStorageKey, enabled),
+      ),
+    );
   }
 
   AppRole _initialRole() {
@@ -296,6 +324,7 @@ class _HomeShellState extends State<HomeShell> {
       targetKey: targetKey,
       createdBy: actorId,
       boardStrokes: _playSession.boardStrokes,
+      boardStickers: _playSession.boardStickers,
     );
 
     setState(() => _playSession = nextSession);
@@ -305,6 +334,17 @@ class _HomeShellState extends State<HomeShell> {
   void _addPlayBoardStroke(PlayBoardStroke stroke) {
     final actorId = widget.session?.uid ?? stroke.actorId;
     final nextSession = _playSession.withBoardStroke(stroke, actorId: actorId);
+
+    setState(() => _playSession = nextSession);
+    _savePlaySession(nextSession);
+  }
+
+  void _addPlayBoardSticker(PlayBoardSticker sticker) {
+    final actorId = widget.session?.uid ?? sticker.actorId;
+    final nextSession = _playSession.withBoardSticker(
+      sticker,
+      actorId: actorId,
+    );
 
     setState(() => _playSession = nextSession);
     _savePlaySession(nextSession);
@@ -535,6 +575,9 @@ class _HomeShellState extends State<HomeShell> {
         onEndCall: _endCall,
         onPlayAnswer: _answerPlayPrompt,
         onPlayBoardStroke: _addPlayBoardStroke,
+        onPlayBoardSticker: _addPlayBoardSticker,
+        soundEffectsEnabled: _soundEffectsEnabled,
+        onSoundEffectsChanged: _setSoundEffectsEnabled,
         onSignOut: widget.onSignOut,
       ),
       AppRole.parent => ParentControlScreen(
@@ -567,6 +610,8 @@ class _HomeShellState extends State<HomeShell> {
         onUpdateMemberProfile: _updateMemberProfile,
         onRemoveMember: _removeMember,
         onResetFamilySpace: _resetFamilySpace,
+        soundEffectsEnabled: _soundEffectsEnabled,
+        onSoundEffectsChanged: _setSoundEffectsEnabled,
         onSignOut: widget.onSignOut,
       ),
       AppRole.relative => RelativeScreen(
@@ -582,8 +627,11 @@ class _HomeShellState extends State<HomeShell> {
         onEndCall: _endCall,
         onSendPlayPrompt: _sendPlayPrompt,
         onPlayBoardStroke: _addPlayBoardStroke,
+        onPlayBoardSticker: _addPlayBoardSticker,
         onClearPlayBoard: _clearPlayBoard,
         onClearPlay: _clearPlayPrompt,
+        soundEffectsEnabled: _soundEffectsEnabled,
+        onSoundEffectsChanged: _setSoundEffectsEnabled,
         onSignOut: widget.onSignOut,
       ),
     };
@@ -596,7 +644,18 @@ class _HomeShellState extends State<HomeShell> {
             Positioned(
               top: MediaQuery.paddingOf(context).top + 14,
               right: 18,
-              child: _PreviewRoleDock(role: _role, onRoleChanged: _setRole),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SoundEffectsToggle(
+                    enabled: _soundEffectsEnabled,
+                    onChanged: _setSoundEffectsEnabled,
+                    dark: true,
+                  ),
+                  const SizedBox(width: 8),
+                  _PreviewRoleDock(role: _role, onRoleChanged: _setRole),
+                ],
+              ),
             ),
         ],
       ),

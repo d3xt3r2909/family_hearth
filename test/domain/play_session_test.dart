@@ -66,6 +66,18 @@ void main() {
                 ),
                 actorId: 'grandpa',
               )
+              .withBoardSticker(
+                PlayBoardSticker(
+                  id: 'sticker-1',
+                  actorId: 'child',
+                  key: 'cat',
+                  x: 0.72,
+                  y: 0.18,
+                  colorValue: 0xFF4967B1,
+                  createdAt: DateTime.parse('2026-06-29T10:01:00.000'),
+                ),
+                actorId: 'child',
+              )
               .answeredBy(PlaySession.childTouchKey);
 
       final restored = PlaySession.fromJson('play-1', session.toJson());
@@ -73,7 +85,10 @@ void main() {
       expect(restored.activity, PlayActivity.animalSounds);
       expect(restored.status, PlaySessionStatus.answered);
       expect(restored.targetKey, 'dog');
+      expect(restored.hasBoard, isTrue);
       expect(restored.boardStrokes.single.points.last.x, 0.4);
+      expect(restored.boardStickers.single.key, 'cat');
+      expect(restored.boardStickers.single.x, 0.72);
       expect(restored.childResponseKey, PlaySession.childTouchKey);
       expect(restored.childResponseCorrect, isNull);
     });
@@ -103,6 +118,50 @@ void main() {
         hasLength(PlayActivityCatalog.maxBoardStrokes),
       );
       expect(session.boardStrokes.first.id, 'stroke-3');
+    });
+
+    test('keeps shared board stickers bounded and movable', () {
+      var session = PlaySession.idle(id: 'play-1', familyId: 'family');
+
+      for (
+        var index = 0;
+        index < PlayActivityCatalog.maxBoardStickers + 3;
+        index += 1
+      ) {
+        session = session.withBoardSticker(
+          PlayBoardSticker(
+            id: 'sticker-$index',
+            actorId: 'grandma',
+            key: index.isEven ? 'dog' : 'cow',
+            x: 0.1,
+            y: 0.2,
+            colorValue: 0xFFE85D43,
+            createdAt: DateTime(2026, 6, 29),
+          ),
+          actorId: 'grandma',
+        );
+      }
+
+      session = session.withBoardSticker(
+        PlayBoardSticker(
+          id: 'sticker-3',
+          actorId: 'child',
+          key: 'cat',
+          x: 0.8,
+          y: 0.7,
+          colorValue: 0xFF4967B1,
+          createdAt: DateTime(2026, 6, 29, 10),
+        ),
+        actorId: 'child',
+      );
+
+      expect(
+        session.boardStickers,
+        hasLength(PlayActivityCatalog.maxBoardStickers),
+      );
+      expect(session.boardStickers.first.id, 'sticker-4');
+      expect(session.boardStickers.last.id, 'sticker-3');
+      expect(session.boardStickers.last.x, 0.8);
     });
   });
 }

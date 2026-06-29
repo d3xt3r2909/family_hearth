@@ -12,6 +12,7 @@ import '../../i18n/app_localizations.dart';
 import '../child/child_wall_screen.dart';
 import '../shared/family_hearth_mark.dart';
 import '../shared/language_menu.dart';
+import '../shared/sound_effects_toggle.dart';
 
 class ParentControlScreen extends StatelessWidget {
   const ParentControlScreen({
@@ -42,6 +43,8 @@ class ParentControlScreen extends StatelessWidget {
     required this.onUpdateMemberProfile,
     required this.onRemoveMember,
     required this.onResetFamilySpace,
+    required this.soundEffectsEnabled,
+    required this.onSoundEffectsChanged,
     this.onSignOut,
   });
 
@@ -76,6 +79,8 @@ class ParentControlScreen extends StatelessWidget {
   onUpdateMemberProfile;
   final Future<void> Function(FamilyMember member) onRemoveMember;
   final Future<void> Function() onResetFamilySpace;
+  final bool soundEffectsEnabled;
+  final ValueChanged<bool> onSoundEffectsChanged;
   final VoidCallback? onSignOut;
 
   @override
@@ -105,6 +110,9 @@ class ParentControlScreen extends StatelessWidget {
                   onEndCall: () {},
                   onPlayAnswer: (_) {},
                   onPlayBoardStroke: (_) {},
+                  onPlayBoardSticker: (_) {},
+                  soundEffectsEnabled: soundEffectsEnabled,
+                  onSoundEffectsChanged: onSoundEffectsChanged,
                 ),
               ],
             ),
@@ -145,6 +153,8 @@ class ParentControlScreen extends StatelessWidget {
                             roleLabel: roleLabel,
                             childWallActive: childWallActive,
                             firebaseStatus: firebaseStatus,
+                            soundEffectsEnabled: soundEffectsEnabled,
+                            onSoundEffectsChanged: onSoundEffectsChanged,
                             onSignOut: onSignOut,
                           ),
                           const SizedBox(height: 16),
@@ -333,6 +343,8 @@ class _ParentHero extends StatelessWidget {
     required this.roleLabel,
     required this.childWallActive,
     required this.firebaseStatus,
+    required this.soundEffectsEnabled,
+    required this.onSoundEffectsChanged,
     required this.onSignOut,
   });
 
@@ -342,6 +354,8 @@ class _ParentHero extends StatelessWidget {
   final String roleLabel;
   final bool childWallActive;
   final FirebaseBootstrapResult firebaseStatus;
+  final bool soundEffectsEnabled;
+  final ValueChanged<bool> onSoundEffectsChanged;
   final VoidCallback? onSignOut;
 
   @override
@@ -408,6 +422,11 @@ class _ParentHero extends StatelessWidget {
                   onPressed: onSignOut,
                   icon: const Icon(Icons.logout_rounded),
                 ),
+              SoundEffectsToggle(
+                enabled: soundEffectsEnabled,
+                onChanged: onSoundEffectsChanged,
+                dark: true,
+              ),
               const LanguageMenu(
                 dark: true,
                 backgroundColor: Color(0xFF3A2D24),
